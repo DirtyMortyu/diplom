@@ -3,21 +3,22 @@ const $ = sel => document.querySelector(sel);
 const logBox = $("#log");
 
 // Подключаемся к брокеру через защищенный WebSocket (WSS)
+// ======= ИСПРАВЛЕННЫЙ MQTT (ПОРТ 443) =======
 const mqttClient = mqtt.connect('wss://broker.emqx.io:443/mqtt', {
     keepalive: 60,
     reconnectPeriod: 1000,
     connectTimeout: 30 * 1000,
-    path: '/mqtt' // Обязательно для порта 443
+    path: '/mqtt' // Критически важно для работы через 443 порт
 });
 
 mqttClient.on('connect', () => {
-    console.log("MQTT Connected!");
+    console.log("MQTT: Успешно подключено через порт 443!");
     log("Связь с облаком установлена", "net");
 });
 
 mqttClient.on('error', (err) => {
-    console.error("MQTT Error:", err);
-    log("Ошибка MQTT! Проверьте интернет", "net");
+    console.error("MQTT Connection Error:", err);
+    log("Ошибка подключения к облаку", "net");
 });
 
 function log(msg, cat = "misc") {
