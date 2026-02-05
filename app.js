@@ -1,20 +1,39 @@
 // ======= HELPERS =======
 const $ = sel => document.querySelector(sel);
 const logBox = $("#log");
-// --- ИНИЦИАЛИЗАЦИЯ MQTT ---
+
+// ======= MQTT ИНИЦИАЛИЗАЦИЯ =======
 // Подключаемся к брокеру через защищенный WebSocket (WSS)
 const mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
 
 mqttClient.on('connect', () => {
-    log("MQTT: Подключено к облаку", "net");
+    log("MQTT: Подключено к облаку брокера", "net");
 });
 
 mqttClient.on('error', (err) => {
-    log("MQTT: Ошибка соединения", "net");
+    log("MQTT: Ошибка соединения с облаком", "net");
     console.error(err);
 });
 
-// --- ФУНКЦИЯ ОТПРАВКИ ---
+// ======= LOGGING =======
+function log(msg, cat = "misc") {
+  const ts = new Date().toLocaleTimeString();
+  if (cat === "motor" && !$("#logMotor").checked) return;
+  if (cat === "net" && !$("#logNet").checked) return;
+  if (cat === "telem" && !$("#logTelem").checked) return;
+  const line = document.createElement("div");
+  line.textContent = `[${ts}] ${msg}`;
+  logBox.prepend(line);
+}
+
+$("#clearLog").onclick = () => logBox.innerHTML = "";
+
+// ======= AUTH STATE =======
+let currentUser = null;
+let apiBase = $("#apiBase")?.value.trim();
+let demo = false;
+
+// ======= SEND COMMAND (MQTT VERSION) =======
 async function sendESPCommand(cmd) {
   if (!currentUser) {
     showLoginModal();
@@ -40,20 +59,9 @@ async function sendESPCommand(cmd) {
   });
 }
 
-function log(msg, cat = "misc") {
-  const ts = new Date().toLocaleTimeString();
-  if (cat === "motor" && !$("#logMotor").checked) return;
-  if (cat === "net" && !$("#logNet").checked) return;
-  if (cat === "telem" && !$("#logTelem").checked) return;
-  const line = document.createElement("div");
-  line.textContent = `[${ts}] ${msg}`;
-  logBox.prepend(line);
-}
+async function stopESP() { await sendESPCommand("stop"); }
 
-$("#clearLog").onclick = () => logBox.innerHTML = "";
-
-let currentUser = null;
-
+// ======= UI & LOGIN =======
 function showLoginModal() {
   $("#loginModal").style.display = "flex";
   $("#loginInput").value = "";
@@ -66,13 +74,11 @@ function hideLoginModal() {
 }
 
 async function login() {
-    const loginInput = document.getElementById("loginInput").value.trim();
-    const password = document.getElementById("passwordInput").value;
-    
-    // ВАЖНО: берем актуальный адрес из поля прямо перед запросом
-    apiBase = document.getElementById("apiBase").value.trim();
+    const loginInput = $("#loginInput").value.trim();
+    const password = $("#passwordInput").value;
+    apiBase = $("#apiBase").value.trim();
 
-    log(`Попытка входа на сервер: ${apiBase}`, "net"); // Это появится в твоем логе на сайте
+    log(`Вход на сервер: ${apiBase}`, "net");
 
     if (!loginInput || !password) {
         alert("Введите логин и пароль!");
@@ -98,12 +104,10 @@ async function login() {
             alert(data.message || "Неверный логин или пароль!");
         }
     } catch (err) {
-        console.error("Детальная ошибка:", err);
         log(`Ошибка входа: ${err.message}`, "net");
-        alert("Не удалось связаться с сервером. Проверьте адрес API!");
+        alert("Не удалось связаться с сервером!");
     }
 }
-
 
 function logout() {
   currentUser = null;
@@ -116,82 +120,33 @@ function loadUserPanel() {
   const mainContent = $(".grid");
   const topbar = $(".topbar");
   
-  // Скрываем/показываем элементы в зависимости от роли
   if (currentUser?.role === "user") {
-    // ПОЛЬЗОВАТЕЛЬ - только управление и видео
     $(".brand strong").textContent = "RoboPanel - Пользователь";
-    
-    // Показываем только нужные карточки
     $(".controls").style.display = "block";
     $(".video").style.display = "block";
-    
-    // Скрываем остальные
     $(".status").style.display = "none";
     $(".tasks").style.display = "none";
     $(".logs").style.display = "none";
-    
-    // Настраиваем grid
     mainContent.style.gridTemplateColumns = "1fr 1fr";
-    mainContent.style.gridTemplateRows = "auto";
-    
-    // Добавляем кнопку выхода
-    if (!$("#logoutBtn")) {
-      const logoutBtn = document.createElement("button");
-      logoutBtn.id = "logoutBtn";
-      logoutBtn.textContent = "Выйти";
-      logoutBtn.style.marginLeft = "10px";
-      logoutBtn.onclick = logout;
-      topbar.querySelector(".conn").appendChild(logoutBtn);
-    }
-    
   } else if (currentUser?.role === "admin") {
-    // АДМИНИСТРАТОР - всё
     $(".brand strong").textContent = "RoboPanel - Администратор";
-    
-    // Показываем все карточки
     $(".controls").style.display = "block";
     $(".video").style.display = "block";
     $(".status").style.display = "block";
     $(".tasks").style.display = "block";
     $(".logs").style.display = "block";
-    
-    // Восстанавливаем оригинальный grid
     mainContent.style.gridTemplateColumns = "380px 1fr 420px";
-    mainContent.style.gridTemplateRows = "auto auto";
-    
-    // Добавляем кнопку выхода
-    if (!$("#logoutBtn")) {
-      const logoutBtn = document.createElement("button");
-      logoutBtn.id = "logoutBtn";
-      logoutBtn.textContent = "Выйти";
-      logoutBtn.style.marginLeft = "10px";
-      logoutBtn.onclick = logout;
-      topbar.querySelector(".conn").appendChild(logoutBtn);
-    }
+  }
+
+  if (!$("#logoutBtn")) {
+    const logoutBtn = document.createElement("button");
+    logoutBtn.id = "logoutBtn";
+    logoutBtn.textContent = "Выйти";
+    logoutBtn.style.marginLeft = "10px";
+    logoutBtn.onclick = logout;
+    topbar.querySelector(".conn").appendChild(logoutBtn);
   }
 }
-
-// ====== GLOBALS ======
-let apiBase = $("#apiBase")?.value.trim(); // Сервер (Render)
-let roverIp = $("#roverIp")?.value.trim(); // Ровер (ESP32)
-let demo = false;
-
-// Кнопка обновления настроек
-$("#connectBtn").onclick = () => { 
-    apiBase = $("#apiBase").value.trim();
-    roverIp = $("#roverIp").value.trim();
-    
-    // Проверка: добавил ли пользователь http://
-    if (roverIp && !roverIp.startsWith('http')) {
-        roverIp = 'http://' + roverIp;
-        $("#roverIp").value = roverIp;
-    }
-
-    log(`Настроено: Сервер=${apiBase} | Ровер=${roverIp}`, "net");
-    
-    // Проверяем связь с ровером (тестовый стоп)
-    if (currentUser) sendESPCommand("stop"); 
-};
 
 // ====== COMMAND MAPPING ======
 const cmdMap = {
@@ -203,100 +158,58 @@ const cmdMap = {
   TURN360: "TURN360"
 };
 
-// ====== SEND COMMAND ======
-async function sendESPCommand(cmd) {
-  if (!currentUser) return;
-  const espCmd = cmdMap[cmd] || "STOP";
-  
-  roverIp = $("#roverIp").value.trim();
-  // Убеждаемся, что адрес полный
-  if (!roverIp.startsWith('http')) roverIp = 'http://' + roverIp;
+// ====== EVENT LISTENERS ======
+$("#connectBtn").onclick = () => { 
+    apiBase = $("#apiBase").value.trim();
+    log(`Настройки обновлены. Сервер: ${apiBase}`, "net");
+};
 
-  // Формируем URL. Для GET запроса аргументы идут через ?
-  const url = `${roverIp}/api/move?cmd=${espCmd}`;
-
-  console.log("Отправка на:", url); // Увидишь в консоли, куда летит запрос
-
-  try {
-    // Используем самый простой способ отправки, который игнорирует CORS
-    fetch(url, { 
-      mode: 'no-cors',
-      method: 'GET'
-    });
-    
-    log(`Команда отправлена: ${espCmd}`, "motor");
-  } catch(e) {
-    log(`Ошибка: ${e.message}`, "net");
-  }
-}
-
-async function stopESP() { await sendESPCommand("stop"); }
-
-// ====== BUTTON CONTROL ======
 document.querySelectorAll(".btn").forEach(b => {
   b.addEventListener("mousedown", () => sendESPCommand(b.dataset.cmd));
   b.addEventListener("touchstart", e => { e.preventDefault(); sendESPCommand(b.dataset.cmd); }, {passive:false});
 });
+
 document.querySelectorAll(".dir").forEach(b => {
   b.addEventListener("mouseup", stopESP);
   b.addEventListener("mouseleave", e => { if(e.buttons===1) stopESP(); });
   b.addEventListener("touchend", stopESP);
 });
 
-// ====== TURN360 BUTTON ======
-document.addEventListener("DOMContentLoaded", () => {
-    const turnBtn = document.getElementById("square");
-    if(turnBtn) {
-        turnBtn.addEventListener("click", () => {
-            sendESPCommand("TURN360");
-            log("Команда отправлена: TURN360", "motor");
-        });
-    }
-});
+$("#square")?.addEventListener("click", () => sendESPCommand("TURN360"));
 
 // ====== KEYBOARD CONTROL ======
 let keysPressed = new Set();
-let currentCmd = "stop"; // текущая команда
-let kbEnabled = false; // глобально: включена ли клавиатура
+let currentCmd = "stop";
+let kbEnabled = false;
 
-// кнопка переключения клавиатуры
 $("#kbBtn").onclick = () => {
     kbEnabled = !kbEnabled;
-    $("#kbBtn").innerText = kbEnabled ? "Выключить управление клавой" : "Включить управление клавой";
+    $("#kbBtn").innerText = kbEnabled ? "Выключить клаву" : "Включить клаву";
     $("#kbStatus").innerText = "Режим: " + (kbEnabled ? "включён" : "выключен");
 };
 
-// маппинг клавиш
 const keyMap = { 
   "w": "forward", "ArrowUp": "forward", "W": "forward",
   "s": "backward", "ArrowDown": "backward", "S": "backward",
   "a": "left", "ArrowLeft": "left", "A": "left",
   "d": "right", "ArrowRight": "right", "D": "right",
-  " ": "stop",
-  "k": "TURN360",
+  " ": "stop", "k": "TURN360",
 };
 
-// обработчик нажатия
 document.addEventListener("keydown", e => {
-  if (!kbEnabled) return;
-  const cmd = keyMap[e.key];
-  if (!cmd) return;
-
-  if (!keysPressed.has(e.key)) keysPressed.add(e.key);
-
-  const newCmd = Array.from(keysPressed).map(k => keyMap[k])[0] || "stop";
+  if (!kbEnabled || !keyMap[e.key]) return;
+  keysPressed.add(e.key);
+  const newCmd = keyMap[Array.from(keysPressed)[0]] || "stop";
   if (newCmd !== currentCmd) {
     currentCmd = newCmd;
     sendESPCommand(currentCmd);
   }
 });
 
-// обработчик отпускания
 document.addEventListener("keyup", e => {
   if (!kbEnabled) return;
-  if (keysPressed.has(e.key)) keysPressed.delete(e.key);
-
-  const newCmd = Array.from(keysPressed).map(k => keyMap[k])[0] || "stop";
+  keysPressed.delete(e.key);
+  const newCmd = keyMap[Array.from(keysPressed)[0]] || "stop";
   if (newCmd !== currentCmd) {
     currentCmd = newCmd;
     sendESPCommand(currentCmd);
@@ -314,27 +227,9 @@ function drawJoy() {
   jctx.clearRect(0,0,joy.width,joy.height);
   jctx.beginPath(); jctx.arc(center.x, center.y, R, 0, Math.PI*2);
   jctx.strokeStyle = "#2a3140"; jctx.lineWidth = 3; jctx.stroke();
-
-  jctx.beginPath();
-  jctx.moveTo(center.x-R, center.y); jctx.lineTo(center.x+R, center.y);
-  jctx.moveTo(center.x, center.y-R); jctx.lineTo(center.x, center.y+R);
-  jctx.strokeStyle = "#243042"; jctx.lineWidth = 1; jctx.stroke();
-
-  jctx.beginPath();
-  jctx.arc(knob.x, knob.y, knobR, 0, Math.PI*2);
-  jctx.fillStyle = "#1b2330";
-  jctx.fill();
-  jctx.strokeStyle = "#3ea6ff";
-  jctx.lineWidth = 2;
-  jctx.stroke();
-}
-
-function joyCmdFromVec(dx, dy){
- const absDx = Math.abs(dx);
-const absDy = Math.abs(dy);
-if(absDx > absDy) return dx > 0 ? "right" : "left";
-else return dy > 0 ? "forward" : "backward";
-
+  jctx.beginPath(); jctx.arc(knob.x, knob.y, knobR, 0, Math.PI*2);
+  jctx.fillStyle = "#1b2330"; jctx.fill();
+  jctx.strokeStyle = "#3ea6ff"; jctx.lineWidth = 2; jctx.stroke();
 }
 
 function setKnob(pos){
@@ -343,11 +238,19 @@ function setKnob(pos){
   if(mag>R){ const k=R/mag; knob.x=center.x+dx*k; knob.y=center.y+dy*k; }
   else knob={...pos};
   drawJoy();
-  const cmd = joyCmdFromVec(dx, dy);
-  if(cmd==="stop") stopESP(); else sendESPCommand(cmd);
+  const absDx = Math.abs(dx), absDy = Math.abs(dy);
+  let cmd = "stop";
+  if(mag > 20) {
+    if(absDx > absDy) cmd = dx > 0 ? "right" : "left";
+    else cmd = dy < 0 ? "forward" : "backward";
+  }
+  if(cmd !== currentCmd) { currentCmd = cmd; sendESPCommand(cmd); }
 }
 
-function joyRelease(){ dragging=false; knob={...center}; drawJoy(); stopESP(); }
+joy.addEventListener("mousedown", e => { dragging=true; setKnob(joyPosFromEvent(e)); });
+document.addEventListener("mousemove", e => { if(dragging) setKnob(joyPosFromEvent(e)); });
+document.addEventListener("mouseup", () => { dragging=false; knob={...center}; drawJoy(); stopESP(); });
+
 function joyPosFromEvent(e){
   const rect = joy.getBoundingClientRect();
   const x = (e.touches ? e.touches[0].clientX : e.clientX)-rect.left;
@@ -355,41 +258,14 @@ function joyPosFromEvent(e){
   return {x, y};
 }
 
-joy.addEventListener("mousedown", e => { dragging=true; setKnob(joyPosFromEvent(e)); });
-joy.addEventListener("mousemove", e => { if(dragging) setKnob(joyPosFromEvent(e)); });
-document.addEventListener("mouseup", joyRelease);
-joy.addEventListener("touchstart", e => { e.preventDefault(); dragging=true; setKnob(joyPosFromEvent(e)); }, {passive:false});
-joy.addEventListener("touchmove", e => { e.preventDefault(); if(dragging) setKnob(joyPosFromEvent(e)); }, {passive:false});
-joy.addEventListener("touchend", e => { e.preventDefault(); joyRelease(); }, {passive:false});
-
-// ====== DEMO MODE ======
-$("#demoToggle").onchange = () => { demo=$("#demoToggle").checked; log(`Demo: ${demo}`, "net"); };
-
-// ====== INIT ======
 // ====== INIT ======
 window.addEventListener("load", () => {
-  // Проверяем наличие элементов перед чтением
-  if ($("#apiBase")) apiBase = $("#apiBase").value.trim();
-  
   drawJoy();
-  
-  // Инициализация системы входа
   if ($("#loginSubmitBtn")) $("#loginSubmitBtn").onclick = login;
-  
-  // Ввод по Enter
-  $("#loginInput")?.addEventListener("keypress", (e) => { if (e.key === "Enter") login(); });
-  $("#passwordInput")?.addEventListener("keypress", (e) => { if (e.key === "Enter") login(); });
-  
-  // Проверяем сохранённую сессию
   const savedUser = localStorage.getItem("user");
   if (savedUser) {
-    try {
-        currentUser = JSON.parse(savedUser);
-        loadUserPanel();
-    } catch(e) {
-        localStorage.removeItem("user");
-        showLoginModal();
-    }
+    currentUser = JSON.parse(savedUser);
+    loadUserPanel();
   } else {
     showLoginModal();
   }
