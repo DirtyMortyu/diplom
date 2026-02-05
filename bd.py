@@ -1,16 +1,17 @@
 from flask import Flask, request, jsonify
 import pymysql.cursors
 from flask_cors import CORS
+import os
 
 app = Flask(__name__)
 CORS(app)
 
 # === Настройки подключения к БД ===
 db_config = {
-    "host": "91.222.238.6",
-    "user": "rover_user",
-    "password": "strong_password123",
-    "database": "rover_db",
+    "host": os.environ.get("DB_HOST", "91.222.238.6"),
+    "user": os.environ.get("DB_USER", "rover_user"),
+    "password": os.environ.get("DB_PASSWORD", "твой_пароль"),
+    "database": os.environ.get("DB_NAME", "rover_db"),
     "port": 3306,
     "cursorclass": pymysql.cursors.DictCursor
 }
@@ -81,4 +82,7 @@ def move():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    # Render передает порт через переменную окружения PORT
+    port = int(os.environ.get("PORT", 5000))
+    # host="0.0.0.0" обязателен, чтобы сервер был доступен извне
+    app.run(host="0.0.0.0", port=port)
