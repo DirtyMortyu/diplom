@@ -28,6 +28,7 @@ function hideLoginModal() {
 }
 
 async function login() {
+    apiBase = $("#apiBase").value.trim();
     const loginInput = document.getElementById("loginInput").value.trim();
     const password = document.getElementById("passwordInput").value;
 
@@ -134,14 +135,25 @@ function loadUserPanel() {
 }
 
 // ====== GLOBALS ======
-apiBase = $("#apiBase")?.value.trim() || "http://192.168.31.96";
+et apiBase = $("#apiBase")?.value.trim(); // Сервер (Render)
+let roverIp = $("#roverIp")?.value.trim(); // Ровер (ESP32)
 let demo = false;
-let roverIp = $("#roverIp")?.value.trim() || "http://192.168.31.96";
 
+// Кнопка обновления настроек
 $("#connectBtn").onclick = () => { 
-    apiBase = $("#apiBase").value.trim() || "http://192.168.31.96";
-    log(`Используем IP: ${apiBase}`, "net");
-    sendESPCommand("stop"); // стартовая команда
+    apiBase = $("#apiBase").value.trim();
+    roverIp = $("#roverIp").value.trim();
+    
+    // Проверка: добавил ли пользователь http://
+    if (roverIp && !roverIp.startsWith('http')) {
+        roverIp = 'http://' + roverIp;
+        $("#roverIp").value = roverIp;
+    }
+
+    log(`Настроено: Сервер=${apiBase} | Ровер=${roverIp}`, "net");
+    
+    // Проверяем связь с ровером (тестовый стоп)
+    if (currentUser) sendESPCommand("stop"); 
 };
 
 // ====== COMMAND MAPPING ======
@@ -156,7 +168,6 @@ const cmdMap = {
 
 // ====== SEND COMMAND ======
 async function sendESPCommand(cmd) {
-  // 1. Проверяем, вошел ли пользователь
   if (!currentUser) {
     log("Ошибка: Сначала нужно авторизоваться!", "net");
     showLoginModal();
@@ -164,22 +175,33 @@ async function sendESPCommand(cmd) {
   }
 
   const espCmd = cmdMap[cmd] || "STOP";
-  log(`Команда отправлена: ${espCmd}`, "motor");
+  
+  if (demo) {
+      log(`[DEMO] Команда: ${espCmd}`, "motor");
+      return;
+  }
 
-  if (demo) return;
-
-  // 2. Берем актуальный IP ровера
+  // Обновляем IP из поля перед отправкой
   roverIp = $("#roverIp").value.trim();
 
   try {
-    // Отправляем команду НАПРЯМУЮ на ровер (ESP32)
-    await fetch(`${roverIp}/api/move`, {
+    // ВАЖНО: режим 'no-cors' иногда помогает с ESP32, 
+    // но лучше оставить обычный fetch для отладки ошибок
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000); // Таймаут 2 сек
+
+    const response = await fetch(`${roverIp}/api/move`, {
       method: "POST",
       headers: {"Content-Type": "application/x-www-form-urlencoded"},
       body: `cmd=${encodeURIComponent(espCmd)}`,
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
+    log(`Отправлено: ${espCmd}`, "motor");
   } catch(e) {
-    log(`Ровер недоступен: ${e.message}`, "net");
+    console.error("Rover error:", e);
+    log(`Ровер недоступен (${roverIp})`, "net");
   }
 }
 
