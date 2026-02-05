@@ -4,10 +4,16 @@ const logBox = $("#log");
 
 // ======= MQTT ИНИЦИАЛИЗАЦИЯ =======
 // Подключаемся к брокеру через защищенный WebSocket (WSS)
-const mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+// Попробуй этот адрес, если 8084 блокируется
+const mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+    keepalive: 60,
+    reconnectPeriod: 1000,
+    connectTimeout: 30 * 1000,
+});
 
 mqttClient.on('connect', () => {
-    log("MQTT: Подключено к облаку брокера", "net");
+    console.log("MQTT Connected!");
+    log("Связь с облаком установлена", "net");
 });
 
 mqttClient.on('error', (err) => {
