@@ -28,43 +28,42 @@ function hideLoginModal() {
 }
 
 async function login() {
-    apiBase = $("#apiBase").value.trim();
     const loginInput = document.getElementById("loginInput").value.trim();
     const password = document.getElementById("passwordInput").value;
+    
+    // ВАЖНО: берем актуальный адрес из поля прямо перед запросом
+    apiBase = document.getElementById("apiBase").value.trim();
+
+    log(`Попытка входа на сервер: ${apiBase}`, "net"); // Это появится в твоем логе на сайте
 
     if (!loginInput || !password) {
         alert("Введите логин и пароль!");
         return;
     }
- try {
-    const response = await fetch(`${apiBase}/api/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ login: loginInput, password })
-    });
 
-    const data = await response.json(); // Сначала читаем ответ
+    try {
+        const response = await fetch(`${apiBase}/api/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ login: loginInput, password })
+        });
 
-    if (!response.ok) {
-        // Если сервер вернул 500 или 401, показываем текст ошибки с сервера
-        throw new Error(data.error || data.message || `Ошибка сети: ${response.status}`);
+        const data = await response.json();
+
+        if (data.success) {
+            currentUser = { login: data.login, role: data.role };
+            localStorage.setItem("user", JSON.stringify(currentUser));
+            loadUserPanel();
+            hideLoginModal();
+            log(`Успех! Роль: ${data.role}`, "misc");
+        } else {
+            alert(data.message || "Неверный логин или пароль!");
+        }
+    } catch (err) {
+        console.error("Детальная ошибка:", err);
+        log(`Ошибка входа: ${err.message}`, "net");
+        alert("Не удалось связаться с сервером. Проверьте адрес API!");
     }
-
-    if (data.success) {
-        currentUser = { login: data.login, role: data.role };
-        localStorage.setItem("user", JSON.stringify(currentUser));
-        loadUserPanel();
-        hideLoginModal();
-        log(`Вход выполнен как ${data.role}`, "misc");
-    } else {
-        // Логическая ошибка (например, неверный пароль, если статус был 200)
-        alert(data.message || "Неверный логин или пароль!");
-    }
-} catch (err) {
-    console.error(err);
-    // Теперь alert покажет реальную ошибку: "Ошибка подключения к БД: ..."
-    alert(err.message); 
-}
 }
 
 
