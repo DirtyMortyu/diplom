@@ -170,35 +170,28 @@ async function sendESPCommand(cmd) {
   if (!currentUser) return;
   const espCmd = cmdMap[cmd] || "STOP";
   
-  if (demo) {
-      log(`[DEMO] Команда: ${espCmd}`, "motor");
-      return;
-  }
-
   roverIp = $("#roverIp").value.trim();
-  if (roverIp && !roverIp.startsWith('http')) {
-      roverIp = 'http://' + roverIp;
-  }
+  // Убеждаемся, что адрес полный
+  if (!roverIp.startsWith('http')) roverIp = 'http://' + roverIp;
 
-  // Формируем URL с параметром
+  // Формируем URL. Для GET запроса аргументы идут через ?
   const url = `${roverIp}/api/move?cmd=${espCmd}`;
 
-  try {
-    // mode: 'no-cors' — это критически важно! 
-    // Он говорит браузеру: "Просто отправь запрос и не задавай вопросов про безопасность"
-    fetch(url, {
-      method: "GET", 
-      mode: 'no-cors',
-      cache: 'no-cache'
-    });
+  console.log("Отправка на:", url); // Увидишь в консоли, куда летит запрос
 
-    // Мы пишем в лог сразу, так как в режиме no-cors мы не можем прочитать ответ
-    log(`Отправлено: ${espCmd}`, "motor");
+  try {
+    // Используем самый простой способ отправки, который игнорирует CORS
+    fetch(url, { 
+      mode: 'no-cors',
+      method: 'GET'
+    });
+    
+    log(`Команда отправлена: ${espCmd}`, "motor");
   } catch(e) {
-    // Эта часть сработает, только если совсем нет сети
-    console.log("Запрос отправлен (no-cors mode)");
+    log(`Ошибка: ${e.message}`, "net");
   }
 }
+
 async function stopESP() { await sendESPCommand("stop"); }
 
 // ====== BUTTON CONTROL ======
