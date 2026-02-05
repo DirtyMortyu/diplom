@@ -342,17 +342,22 @@ $("#demoToggle").onchange = () => { demo=$("#demoToggle").checked; log(`Demo: ${
 
 // ====== INIT ======
 window.addEventListener("load", () => {
-  // Инициализируем адреса из инпутов в HTML
   apiBase = $("#apiBase").value.trim(); 
-  roverIp = $("#roverIp").value.trim();
-  
   drawJoy();
   
+  // Инициализация системы входа
   $("#loginSubmitBtn").onclick = login;
   
-  $("#loginInput").addEventListener("keypress", (e) => { if (e.key === "Enter") login(); });
-  $("#passwordInput").addEventListener("keypress", (e) => { if (e.key === "Enter") login(); });
+  // Ввод по Enter в полях ввода
+  $("#loginInput").addEventListener("keypress", (e) => {
+    if (e.key === "Enter") login();
+  });
   
+  $("#passwordInput").addEventListener("keypress", (e) => {
+    if (e.key === "Enter") login();
+  });
+  
+  // Проверяем сохранённую сессию
   const savedUser = localStorage.getItem("user");
   if (savedUser) {
     currentUser = JSON.parse(savedUser);
