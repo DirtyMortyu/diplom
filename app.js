@@ -4,29 +4,29 @@ const logBox = $("#log");
 
 
 // Полностью замени блок создания mqttClient на этот:
-const mqttClient = mqtt.connect('wss://broker.emqx.io:443/mqtt', {
-    protocol: 'wss',
-    path: '/mqtt',
-    clientId: 'web_' + Math.random().toString(16).substr(2, 8), 
-    clean: true,          // Говорим брокеру не хранить старую сессию
-    connectTimeout: 5000, 
-    reconnectPeriod: 2000,
-    // Убираем лишние заголовки, чтобы брокер не закрывал соединение
+// ======= УЛЬТИМАТИВНЫЙ КОННЕКТ =======
+const mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+    clientId: 'web_user_' + Math.random().toString(16).slice(2, 8),
+    keepalive: 60,
+    clean: true,
+    connectTimeout: 20 * 1000,
+    reconnectPeriod: 5000, // Увеличил интервал, чтобы брокер не считал нас спамом
+    protocolVersion: 4 // Принудительно MQTT 3.1.1
 });
 
 mqttClient.on('connect', () => {
-    console.log("✅ ЕСТЬ КОННЕКТ!");
-    log("Связь установлена!", "net");
-    // Сразу подписываемся на топик, чтобы проверить связь в обе стороны
+    console.log("✅ MQTT ПОДКЛЮЧЕН!");
+    log("Связь с облаком установлена", "net");
     mqttClient.subscribe('dirtymortyu/rover/status');
 });
 
-mqttClient.on('close', () => {
-    console.log("⚠️ Брокер разорвал соединение. Переподключение...");
+mqttClient.on('reconnect', () => {
+    console.log("🔄 Переподключение к MQTT...");
 });
 
 mqttClient.on('error', (err) => {
-    console.log("❌ Ошибка MQTT:", err);
+    console.error("❌ Ошибка MQTT:", err);
+    log("Ошибка связи", "net");
 });
 
 function log(msg, cat = "misc") {
