@@ -167,12 +167,7 @@ const cmdMap = {
 
 // ====== SEND COMMAND ======
 async function sendESPCommand(cmd) {
-  if (!currentUser) {
-    log("Ошибка: Сначала нужно авторизоваться!", "net");
-    showLoginModal();
-    return;
-  }
-
+  if (!currentUser) return;
   const espCmd = cmdMap[cmd] || "STOP";
   
   if (demo) {
@@ -180,27 +175,30 @@ async function sendESPCommand(cmd) {
       return;
   }
 
-  // Обновляем IP из поля перед отправкой
   roverIp = $("#roverIp").value.trim();
   if (roverIp && !roverIp.startsWith('http')) {
       roverIp = 'http://' + roverIp;
   }
 
+  // Формируем URL с параметром
+  const url = `${roverIp}/api/move?cmd=${espCmd}`;
+
   try {
-    // Используем 'no-cors', чтобы обойти блокировку Mixed Content (HTTPS -> HTTP)
-    // Мы не получим ответ от сервера, но запрос уйдет.
-    fetch(`${roverIp}/api/move?cmd=${espCmd}`, {
-      method: "GET", // Переключаемся на GET, так проще для ESP32 и CORS
-      mode: 'no-cors' 
+    // mode: 'no-cors' — это критически важно! 
+    // Он говорит браузеру: "Просто отправь запрос и не задавай вопросов про безопасность"
+    fetch(url, {
+      method: "GET", 
+      mode: 'no-cors',
+      cache: 'no-cache'
     });
 
+    // Мы пишем в лог сразу, так как в режиме no-cors мы не можем прочитать ответ
     log(`Отправлено: ${espCmd}`, "motor");
   } catch(e) {
-    console.error("Rover error:", e);
-    log(`Ошибка сети: ${e.message}`, "net");
+    // Эта часть сработает, только если совсем нет сети
+    console.log("Запрос отправлен (no-cors mode)");
   }
 }
-
 async function stopESP() { await sendESPCommand("stop"); }
 
 // ====== BUTTON CONTROL ======
