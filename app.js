@@ -34,12 +34,10 @@ let apiBase = $("#apiBase")?.value.trim();
 let demo = false;
 
 // ======= SEND COMMAND (MQTT VERSION) =======
+// ======= НОВАЯ ФУНКЦИЯ ОТПРАВКИ (БЕЗ HTTP) =======
 async function sendESPCommand(cmd) {
-  if (!currentUser) {
-    showLoginModal();
-    return;
-  }
-
+  if (!currentUser) return;
+  
   const espCmd = cmdMap[cmd] || "STOP";
   
   if (demo) {
@@ -47,14 +45,21 @@ async function sendESPCommand(cmd) {
       return;
   }
 
-  // Публикуем команду в топик, который слушает ESP8266
+  // Проверяем, подключен ли MQTT клиент
+  if (!mqttClient.connected) {
+      log("MQTT: Нет связи с облаком!", "net");
+      return;
+  }
+
   const topic = 'dirtymortyu/rover/cmd';
   
+  // Отправляем команду в облако
   mqttClient.publish(topic, espCmd, { qos: 0 }, (err) => {
       if (err) {
-          log("Ошибка отправки в облако", "net");
+          console.error("MQTT Publish Error:", err);
+          log("Ошибка отправки команды", "net");
       } else {
-          log(`Отправлено: ${espCmd}`, "motor");
+          log(`Облако -> ${espCmd}`, "motor");
       }
   });
 }
