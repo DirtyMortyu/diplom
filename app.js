@@ -182,25 +182,22 @@ async function sendESPCommand(cmd) {
 
   // Обновляем IP из поля перед отправкой
   roverIp = $("#roverIp").value.trim();
+  if (roverIp && !roverIp.startsWith('http')) {
+      roverIp = 'http://' + roverIp;
+  }
 
   try {
-    // ВАЖНО: режим 'no-cors' иногда помогает с ESP32, 
-    // но лучше оставить обычный fetch для отладки ошибок
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000); // Таймаут 2 сек
-
-    const response = await fetch(`${roverIp}/api/move`, {
-      method: "POST",
-      headers: {"Content-Type": "application/x-www-form-urlencoded"},
-      body: `cmd=${encodeURIComponent(espCmd)}`,
-      signal: controller.signal
+    // Используем 'no-cors', чтобы обойти блокировку Mixed Content (HTTPS -> HTTP)
+    // Мы не получим ответ от сервера, но запрос уйдет.
+    fetch(`${roverIp}/api/move?cmd=${espCmd}`, {
+      method: "GET", // Переключаемся на GET, так проще для ESP32 и CORS
+      mode: 'no-cors' 
     });
 
-    clearTimeout(timeoutId);
     log(`Отправлено: ${espCmd}`, "motor");
   } catch(e) {
     console.error("Rover error:", e);
-    log(`Ровер недоступен (${roverIp})`, "net");
+    log(`Ошибка сети: ${e.message}`, "net");
   }
 }
 
@@ -340,27 +337,30 @@ joy.addEventListener("touchend", e => { e.preventDefault(); joyRelease(); }, {pa
 $("#demoToggle").onchange = () => { demo=$("#demoToggle").checked; log(`Demo: ${demo}`, "net"); };
 
 // ====== INIT ======
+// ====== INIT ======
 window.addEventListener("load", () => {
-  apiBase = $("#apiBase").value.trim(); 
+  // Проверяем наличие элементов перед чтением
+  if ($("#apiBase")) apiBase = $("#apiBase").value.trim();
+  
   drawJoy();
   
   // Инициализация системы входа
-  $("#loginSubmitBtn").onclick = login;
+  if ($("#loginSubmitBtn")) $("#loginSubmitBtn").onclick = login;
   
-  // Ввод по Enter в полях ввода
-  $("#loginInput").addEventListener("keypress", (e) => {
-    if (e.key === "Enter") login();
-  });
-  
-  $("#passwordInput").addEventListener("keypress", (e) => {
-    if (e.key === "Enter") login();
-  });
+  // Ввод по Enter
+  $("#loginInput")?.addEventListener("keypress", (e) => { if (e.key === "Enter") login(); });
+  $("#passwordInput")?.addEventListener("keypress", (e) => { if (e.key === "Enter") login(); });
   
   // Проверяем сохранённую сессию
   const savedUser = localStorage.getItem("user");
   if (savedUser) {
-    currentUser = JSON.parse(savedUser);
-    loadUserPanel();
+    try {
+        currentUser = JSON.parse(savedUser);
+        loadUserPanel();
+    } catch(e) {
+        localStorage.removeItem("user");
+        showLoginModal();
+    }
   } else {
     showLoginModal();
   }
