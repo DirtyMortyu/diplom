@@ -3,10 +3,11 @@ const $ = sel => document.querySelector(sel);
 const logBox = $("#log");
 
 // Подключаемся к брокеру через защищенный WebSocket (WSS)
-const mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+const mqttClient = mqtt.connect('wss://broker.emqx.io:443/mqtt', {
     keepalive: 60,
     reconnectPeriod: 1000,
     connectTimeout: 30 * 1000,
+    path: '/mqtt' // Обязательно для порта 443
 });
 
 mqttClient.on('connect', () => {
