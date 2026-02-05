@@ -1,6 +1,44 @@
 // ======= HELPERS =======
 const $ = sel => document.querySelector(sel);
 const logBox = $("#log");
+// --- ИНИЦИАЛИЗАЦИЯ MQTT ---
+// Подключаемся к брокеру через защищенный WebSocket (WSS)
+const mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+
+mqttClient.on('connect', () => {
+    log("MQTT: Подключено к облаку", "net");
+});
+
+mqttClient.on('error', (err) => {
+    log("MQTT: Ошибка соединения", "net");
+    console.error(err);
+});
+
+// --- ФУНКЦИЯ ОТПРАВКИ ---
+async function sendESPCommand(cmd) {
+  if (!currentUser) {
+    showLoginModal();
+    return;
+  }
+
+  const espCmd = cmdMap[cmd] || "STOP";
+  
+  if (demo) {
+      log(`[DEMO] MQTT: ${espCmd}`, "motor");
+      return;
+  }
+
+  // Публикуем команду в топик, который слушает ESP8266
+  const topic = 'dirtymortyu/rover/cmd';
+  
+  mqttClient.publish(topic, espCmd, { qos: 0 }, (err) => {
+      if (err) {
+          log("Ошибка отправки в облако", "net");
+      } else {
+          log(`Отправлено: ${espCmd}`, "motor");
+      }
+  });
+}
 
 function log(msg, cat = "misc") {
   const ts = new Date().toLocaleTimeString();
