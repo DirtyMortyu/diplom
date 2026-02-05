@@ -7,23 +7,26 @@ const logBox = $("#log");
 const mqttClient = mqtt.connect('wss://broker.emqx.io:443/mqtt', {
     protocol: 'wss',
     path: '/mqtt',
-    clientId: 'rover_' + Math.random().toString(16).slice(2, 8),
-    // ВАЖНО: Эти настройки убирают ошибку в mqtt.min.js
-    protocolId: 'MQIsdp', 
-    protocolVersion: 3,
+    clientId: 'web_' + Math.random().toString(16).substr(2, 8), 
+    clean: true,          // Говорим брокеру не хранить старую сессию
+    connectTimeout: 5000, 
     reconnectPeriod: 2000,
-    connectTimeout: 30 * 1000,
-    resubscribe: true
+    // Убираем лишние заголовки, чтобы брокер не закрывал соединение
 });
 
 mqttClient.on('connect', () => {
-    console.log("✅ СВЯЗЬ УСТАНОВЛЕНА!");
-    log("MQTT подключен через 443", "net");
+    console.log("✅ ЕСТЬ КОННЕКТ!");
+    log("Связь установлена!", "net");
+    // Сразу подписываемся на топик, чтобы проверить связь в обе стороны
+    mqttClient.subscribe('dirtymortyu/rover/status');
+});
+
+mqttClient.on('close', () => {
+    console.log("⚠️ Брокер разорвал соединение. Переподключение...");
 });
 
 mqttClient.on('error', (err) => {
-    console.log("❌ Ошибка:", err.message);
-    log("Ошибка MQTT", "net");
+    console.log("❌ Ошибка MQTT:", err);
 });
 
 function log(msg, cat = "misc") {
