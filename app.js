@@ -136,7 +136,34 @@ function loadUserPanel() {
 // ====== GLOBALS ======
 apiBase = $("#apiBase")?.value.trim() || "http://192.168.31.96";
 let demo = false;
+let roverIp = $("#roverIp")?.value.trim() || "http://192.168.31.96";
+async function sendESPCommand(cmd) {
+  // 1. Проверяем, вошел ли пользователь
+  if (!currentUser) {
+    log("Ошибка: Сначала нужно авторизоваться!", "net");
+    showLoginModal();
+    return;
+  }
 
+  const espCmd = cmdMap[cmd] || "STOP";
+  log(`Команда отправлена: ${espCmd}`, "motor");
+
+  if (demo) return;
+
+  // 2. Берем актуальный IP ровера
+  roverIp = $("#roverIp").value.trim();
+
+  try {
+    // Отправляем команду НАПРЯМУЮ на ровер (ESP32)
+    await fetch(`${roverIp}/api/move`, {
+      method: "POST",
+      headers: {"Content-Type": "application/x-www-form-urlencoded"},
+      body: `cmd=${encodeURIComponent(espCmd)}`,
+    });
+  } catch(e) {
+    log(`Ровер недоступен: ${e.message}`, "net");
+  }
+}
 $("#connectBtn").onclick = () => { 
     apiBase = $("#apiBase").value.trim() || "http://192.168.31.96";
     log(`Используем IP: ${apiBase}`, "net");
