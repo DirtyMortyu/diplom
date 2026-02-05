@@ -137,6 +137,24 @@ function loadUserPanel() {
 apiBase = $("#apiBase")?.value.trim() || "http://192.168.31.96";
 let demo = false;
 let roverIp = $("#roverIp")?.value.trim() || "http://192.168.31.96";
+
+$("#connectBtn").onclick = () => { 
+    apiBase = $("#apiBase").value.trim() || "http://192.168.31.96";
+    log(`Используем IP: ${apiBase}`, "net");
+    sendESPCommand("stop"); // стартовая команда
+};
+
+// ====== COMMAND MAPPING ======
+const cmdMap = {
+  forward: "FORWARD",
+  backward: "BACKWARD",
+  left: "LEFT",
+  right: "RIGHT",
+  stop: "STOP",
+  TURN360: "TURN360"
+};
+
+// ====== SEND COMMAND ======
 async function sendESPCommand(cmd) {
   // 1. Проверяем, вошел ли пользователь
   if (!currentUser) {
@@ -162,42 +180,6 @@ async function sendESPCommand(cmd) {
     });
   } catch(e) {
     log(`Ровер недоступен: ${e.message}`, "net");
-  }
-}
-$("#connectBtn").onclick = () => { 
-    apiBase = $("#apiBase").value.trim() || "http://192.168.31.96";
-    log(`Используем IP: ${apiBase}`, "net");
-    sendESPCommand("stop"); // стартовая команда
-};
-
-// ====== COMMAND MAPPING ======
-const cmdMap = {
-  forward: "FORWARD",
-  backward: "BACKWARD",
-  left: "LEFT",
-  right: "RIGHT",
-  stop: "STOP",
-  TURN360: "TURN360"
-};
-
-// ====== SEND COMMAND ======
-async function sendESPCommand(cmd) {
-  const espCmd = cmdMap[cmd] || "STOP";
-
-  // Лог команды всегда
-  log(`Команда отправлена: ${espCmd}`, "motor");
-
-  if (demo) return;
-
-  try {
-    await fetch(`${apiBase}/api/move`, {
-      method: "POST",
-      headers: {"Content-Type": "application/x-www-form-urlencoded"},
-      body: `cmd=${encodeURIComponent(espCmd)}`,
-    });
-  } catch(e) {
-    // Ошибки сети отдельно, не мешают логам команд
-    log(`Сетевая ошибка: ${e.message}`, "net");
   }
 }
 
