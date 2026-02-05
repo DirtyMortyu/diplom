@@ -134,7 +134,7 @@ function loadUserPanel() {
 }
 
 // ====== GLOBALS ======
-et apiBase = $("#apiBase")?.value.trim(); // Сервер (Render)
+let apiBase = $("#apiBase")?.value.trim(); // Сервер (Render)
 let roverIp = $("#roverIp")?.value.trim(); // Ровер (ESP32)
 let demo = false;
 
