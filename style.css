@@ -1,0 +1,204 @@
+/* Скроллбар */
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: #0c1016; border-radius: 10px; }
+::-webkit-scrollbar-thumb { background: #3ea6ff; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #5fd7a5; }
+
+:root{
+  --bg:#0f1115;
+  --card:#171a21;
+  --text:#e6e6e6;
+  --sub:#9aa4b2;
+  --accent:#3ea6ff;
+  --danger:#ff5d5d;
+  --ok:#4ad97a;
+  --muted:#2a2f3a;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Helvetica Neue",Arial;
+  color:var(--text);
+  background:linear-gradient(180deg,#0b0d11, var(--bg));
+}
+
+.topbar{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 14px;border-bottom:1px solid #222;background:#0c0f14;position:sticky;top:0;z-index:10
+}
+.brand{display:flex;align-items:center;gap:8px}
+.brand .dot{width:10px;height:10px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.brand .ver{color:var(--sub);font-weight:600;font-size:12px;margin-left:6px}
+.conn{display:flex;align-items:center;gap:8px}
+.conn input{background:#0e131a;color:var(--text);border:1px solid #20242b;border-radius:6px;padding:6px 8px;min-width:190px}
+.conn button{padding:8px 10px;border:1px solid #2b313a;background:#0363ff;color:var(--text);border-radius:8px;cursor:pointer}
+/* скрываем стандартный чекбокс */
+.conn .demo input {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  width: 8px;
+  height: 8px;
+  border: 2px solid #3ea6ff;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+  margin: 0px;
+}
+
+/* когда чекнутый */
+.conn .demo input:checked {
+  background: #3ea6ff;
+}
+
+/* рисуем галочку */
+.conn .demo input:checked::after {
+  content: "✔";
+  color: #0f1115;
+  font-size: 12px;
+  position: absolute;
+  top: -2px;
+  left: 2px;
+}
+
+
+ 
+
+
+.grid{
+  display:grid;gap:14px;padding:14px;
+  grid-template-columns: 380px 1fr 420px;
+  grid-template-rows: auto auto;
+}
+.card{
+  background:var(--card);border:1px solid #232836;border-radius:14px;padding:14px;
+  box-shadow:0 10px 30px rgba(0,0,0,.2);
+}
+.card h2{margin:0 0 10px 0}
+h3{margin:10px 0 8px 0;color:var(--sub);font-weight:600}
+
+.controls .drive{display:flex;gap:16px}
+.pad{display:flex;flex-direction:column;align-items:center;gap:10px}
+.pad .mid{display:flex;gap:10px;align-items:center}
+.btn{
+  background:#111722;border:1px solid #2a3140;color:var(--text);
+  border-radius:10px;padding:10px 14px;cursor:pointer;font-size:18px;min-width:48px;min-height:48px
+}
+.btn.stop{background:#1a0f12;border-color:#422931}
+.btn.dir:active,.btn.stop:active{transform:translateY(1px)}
+
+.joystickWrap{margin-top:12px}
+#joystick{background:radial-gradient(ellipse at center,#121722,#0d1117);border:1px solid #242a34;border-radius:12px;display:block}
+.joyHelp{font-size:12px;color:var(--sub);margin-top:6px}
+
+.video .videoWrap{display:flex;flex-direction:column;gap:8px}
+.video img{width:100%;height:420px;object-fit:contain;background:#0a0e13;border:1px solid #202636;border-radius:12px}
+.videoBar{display:flex;gap:8px}
+.videoBar input{flex:1;background:#0e131a;color:var(--text);border:1px solid #20242b;border-radius:6px;padding:6px 8px}
+.videoBar button{padding:8px 10px;border:1px solid #2b313a;background:#111620;color:var(--text);border-radius:8px;cursor:pointer}
+
+.status .kv{
+  display:grid;grid-template-columns:120px 1fr;gap:8px;align-items:center
+}
+.battery{display:flex;align-items:center;gap:8px}
+.battery div{width:100%;height:12px;background:var(--muted);border-radius:999px;overflow:hidden}
+#batteryBar{height:100%;width:0;background:linear-gradient(90deg,#4ad97a,#ffd166)}
+#batteryPct{font-variant-numeric:tabular-nums;color:var(--sub)}
+#tempVal,#speedNow,#rangeVal,#netVal,#poseVal{font-variant-numeric:tabular-nums}
+
+#chart{width:100%;border:1px solid #242a34;background:#0c1016;border-radius:8px}
+
+.poll{display:flex;align-items:center;gap:10px;margin-top:8px}
+
+.logs #log{height:160px;width:100%;background:#0c1015;border:1px solid #1f2532;border-radius:8px;padding:8px;font-family:ui-monospace, SFMono-Regular, Menlo, monospace}
+.logs .row{margin-top:8px;display:flex;gap:12px;justify-content:flex-end;}
+.row button{padding:8px 10px;border:1px solid #2b313a;background:#111620;color:var(--text);border-radius:8px;cursor:pointer}
+
+.foot{padding:16px;color:#7d8899;text-align:center}
+
+
+.poll button{padding:8px 10px;border:1px solid #2b313a;background:#111620;color:var(--text);border-radius:8px;cursor:pointer}
+
+/* ===== Новые стили для «Связь/Ретранслятор» ===== */
+.link .grid2{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:12px;
+}
+.stack{display:flex;flex-direction:column;gap:8px}
+.stack label{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--sub);}
+.stack label1{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--sub);width: 85%;}
+.stack input{background:#0e131a;color:var(--text);border:1px solid #20242b;border-radius:6px;padding:6px 8px}
+.row .warn{border-color:#5b3b00;background:#1d1400}
+.row .danger{border-color:#5a1f24;background:#1a0b0d}
+.row .ok{border-color:#295a3a;background:#0d1711}
+.mini{max-width:160px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#0c1016;border:1px solid #1f2532;border-radius:8px;padding:8px;white-space:pre-wrap}
+.small{font-size:12px;max-height:140px;overflow:auto}
+
+@media (max-width: 1200px){
+  .grid{grid-template-columns:1fr;grid-template-rows:auto}
+  .video img{height:320px}
+  .link .grid2{grid-template-columns:1fr}
+}
+/* Квадратный Demo-чекбокс */
+.conn label.demo {
+  display: flex;
+  align-items: center;
+  gap: 6px;            /* расстояние между текстом и галкой */
+}
+
+/* Сбрасываем общий .conn input и рисуем свой квадрат */
+.conn label.demo input#demoToggle{
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  width: 18px;
+  height: 18px;
+  min-width: 18px;     /* ВАЖНО: перезаписываем min-width:190px */
+  padding: 0;          /* ВАЖНО: убираем внутренние отступы */
+  margin: 0;
+
+  box-sizing: border-box;
+  border: 2px solid #3ea6ff;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* состояние «включено» */
+.conn label.demo input#demoToggle:checked{
+  background: #3ea6ff;
+}
+
+/* галочка */
+.conn label.demo input#demoToggle:checked::after{
+  content: "✔";
+  position: absolute;
+  left: 2px;
+  top: -2px;
+  font-size: 12px;
+  color: #0f1115;
+}
+
+.logs{
+  grid-column: 1/-1;
+ 
+} 
+.logs  #log{
+  width: 100%;
+  max-width: 100%;
+  overflow: auto;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  
+}
