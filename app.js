@@ -5,14 +5,13 @@ const logBox = $("#log");
 
 // Полностью замени блок создания mqttClient на этот:
 // ======= УЛЬТИМАТИВНЫЙ КОННЕКТ =======
-const mqttClient = mqtt.connect('wss://broker.emqx.io:443/mqtt', {
-    path: '/mqtt', // Обязательно для 443 порта
-    clientId: 'web_user_' + Math.random().toString(16).slice(2, 8),
-    keepalive: 60,
+const mqttClient = mqtt.connect('wss://t1c0c0c1.ala.eu-central-1.emqxsl.com:8084/mqtt', {
+    clientId: 'web_' + Math.random().toString(16).slice(2, 8),
+    username: 'rover',    
+    password: 'rover123', 
     clean: true,
-    connectTimeout: 20 * 1000,
-    reconnectPeriod: 5000, // Увеличил интервал, чтобы брокер не считал нас спамом
-    protocolVersion: 4 // Принудительно MQTT 3.1.1
+    connectTimeout: 4000,
+    reconnectPeriod: 1000,
 });
 
 mqttClient.on('connect', () => {
