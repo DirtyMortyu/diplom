@@ -4,7 +4,7 @@ const logBox = $("#log");
 
 // ======= УЛЬТИМАТИВНЫЙ КОННЕКТ MQTT =======
 const options = {
-    protocol: 'ws', // Обязательно ws (Websocket)
+    protocol: 'wss', // Обязательно ws (Websocket)
     host: '91.222.238.6',
     port: 9001,
     path: '/mqtt', // Обычно Mosquitto понимает этот путь
