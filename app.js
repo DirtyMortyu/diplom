@@ -3,17 +3,21 @@ const $ = sel => document.querySelector(sel);
 const logBox = $("#log");
 
 // ======= УЛЬТИМАТИВНЫЙ КОННЕКТ MQTT =======
-const options = {
-    protocol: 'wss', // Обязательно ws (Websocket)
-    host: '91.222.238.6',
-    port: 9001,
-    path: '/mqtt', // Обычно Mosquitto понимает этот путь
-    username: 'rover',
-    password: 'rover123',
-    clientId: 'web_' + Math.random().toString(16).substr(2, 8)
-};
+const client = mqtt.connect('wss://rover-pgk.duckdns.org:9001', {
+    clientId: 'web_' + Math.random().toString(16).substr(2, 8),
+    username: 'rover',       // если у тебя пароль нужен
+    password: 'rover123',    // если у тебя пароль нужен
+    reconnectPeriod: 1000    // авто-переподключение каждые 1с
+});
 
-const client = mqtt.connect(`wss://${options.host}:${options.port}`, options);
+client.on('connect', () => {
+    console.log('MQTT подключён по WSS!');
+});
+
+client.on('error', (err) => {
+    console.error('Ошибка MQTT:', err);
+});
+
 
 function log(msg, cat = "misc") {
     const ts = new Date().toLocaleTimeString();
