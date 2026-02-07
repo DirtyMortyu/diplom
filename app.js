@@ -5,7 +5,8 @@ const logBox = $("#log");
 
 // Полностью замени блок создания mqttClient на этот:
 // ======= УЛЬТИМАТИВНЫЙ КОННЕКТ =======
-const mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+const mqttClient = mqtt.connect('wss://broker.emqx.io:443/mqtt', {
+    path: '/mqtt', // Обязательно для 443 порта
     clientId: 'web_user_' + Math.random().toString(16).slice(2, 8),
     keepalive: 60,
     clean: true,
