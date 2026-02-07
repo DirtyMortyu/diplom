@@ -3,7 +3,7 @@ const $ = sel => document.querySelector(sel);
 const logBox = $("#log");
 
 // ======= УЛЬТИМАТИВНЫЙ КОННЕКТ MQTT =======
-const client = mqtt.connect('wss://rover-pgk.duckdns.org:9001', {
+const client = mqtt.connect('wss://rover-pgk.duckdns.org:9001/mqtt', {
     clientId: 'web_' + Math.random().toString(16).substr(2, 8),
     username: 'rover',       // если у тебя пароль нужен
     password: 'rover123',    // если у тебя пароль нужен
