@@ -13,7 +13,7 @@ const options = {
     clientId: 'web_' + Math.random().toString(16).substr(2, 8)
 };
 
-const client = mqtt.connect(`ws://${options.host}:${options.port}`, options);
+const client = mqtt.connect(`wss://${options.host}:${options.port}`, options);
 
 function log(msg, cat = "misc") {
     const ts = new Date().toLocaleTimeString();
