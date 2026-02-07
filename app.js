@@ -204,9 +204,9 @@ function editUser(idUsers, login, role) {
 function closeUserModal() { $("#userModal").style.display = "none"; }
 
 async function saveUser() {
-    const id = $("#editUserId").value;
+    const idUsers = $("#editUserId").value;
     const login = $("#newLogin").value;
-    const password = $("#newPass").value;
+    const Password = $("#newPass").value;
     const role = $("#newRole").value;
 
     const url = id ? `${apiBase}/api/users/${idUsers}` : `${apiBase}/api/users`;
@@ -215,7 +215,7 @@ async function saveUser() {
     await fetch(url, {
         method: method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ login, password, role })
+        body: JSON.stringify({ login, Password, role })
     });
 
     closeUserModal();

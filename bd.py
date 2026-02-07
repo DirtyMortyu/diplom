@@ -145,7 +145,7 @@ def get_users():
 def manage_user(user_id=None):
     data = request.json
     login_val = data.get("login")
-    password_val = data.get("password")
+    password_val = data.get("Password")
     role_name = data.get("role", "user") # 'admin' или 'user'
 
     connection = None
