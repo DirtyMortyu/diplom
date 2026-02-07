@@ -179,31 +179,34 @@ async function loadUsers() {
 
 // ======= СОХРАНЕНИЕ ЮЗЕРА =======
 async function saveUser() {
-    const idUsers = $("#editUserId").value; 
-    const login = $("#newLogin").value;
-    const password = $("#newPass").value; 
-    const role = $("#newRole").value;
-
-    // Исправлено: используем idUsers для проверки
-    const url = idUsers ? `${apiBase}/api/users/${idUsers}` : `${apiBase}/api/users`;
-    const method = idUsers ? 'PUT' : 'POST';
+    const username = document.getElementById('editUsername').value;
+    const password = document.getElementById('editPassword').value;
+    const role = document.getElementById('editRole').value;
+    
+    // Если у тебя была строка типа const id = ..., и она выдавала ошибку - 
+    // для НОВОГО пользователя мы ID не шлем.
+    
+    const userData = {
+        username: username,
+        password: password,
+        role: role
+    };
 
     try {
-        const response = await fetch(url, {
-            method: method,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ login, password, role })
+        const response = await fetch(`${API_URL}/api/users`, { // Проверь путь к API
+            method: 'POST', // Или PUT, если ты редактируешь
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(userData)
         });
-        
+
         if (response.ok) {
-            closeUserModal();
-            loadUsers();
+            alert("Пользователь сохранен!");
+            loadUsers(); // Обновить список
         } else {
-            const err = await response.json();
-            alert("Ошибка: " + err.message);
+            console.error("Ошибка сервера");
         }
-    } catch (e) {
-        alert("Ошибка сети");
+    } catch (error) {
+        console.error("Ошибка запроса:", error);
     }
 }
 
