@@ -127,7 +127,7 @@ def get_users():
             sql = """
                 SELECT u.idUsers as id, u.login, r.name as role 
                 FROM Users u
-                JOIN role r ON u.role_id = r.idrole
+                JOIN role r ON u.idrole = r.idrole
             """
             cursor.execute(sql)
             users = cursor.fetchall()
@@ -162,17 +162,17 @@ def manage_user(user_id=None):
             # 2. Логика для PUT (Обновление)
             if request.method == "PUT" and user_id:
                 if password_val: # Если прислали пароль — меняем всё
-                    sql = "UPDATE Users SET login=%s, Password=%s, role_id=%s WHERE idUsers=%s"
+                    sql = "UPDATE Users SET login=%s, Password=%s, idrole=%s WHERE idUsers=%s"
                     cursor.execute(sql, (login_val, password_val, role_id, user_id))
                 else: # Если пароля нет — меняем только роль и логин
-                    sql = "UPDATE Users SET login=%s, role_id=%s WHERE idUsers=%s"
+                    sql = "UPDATE Users SET login=%s, idrole=%s WHERE idUsers=%s"
                     cursor.execute(sql, (login_val, role_id, user_id))
 
             # 3. Логика для POST (Создание)
             else:
                 if not password_val:
                     return jsonify({"success": False, "message": "Нужен пароль"}), 400
-                sql = "INSERT INTO Users (login, Password, role_id) VALUES (%s, %s, %s)"
+                sql = "INSERT INTO Users (login, Password, idrole) VALUES (%s, %s, %s)"
                 cursor.execute(sql, (login_val, password_val, role_id))
             
             connection.commit()
