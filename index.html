@@ -97,28 +97,49 @@
 
   <!-- ПРАВАЯ КОЛОНКА -->
   <section class="card status">
-    <h2>Статус</h2>
-    <div class="kv">
-      <div>Батарея</div>
-      <div class="battery">
-        <div id="batteryBar"></div>
-        <span id="batteryPct">--%</span>
-      </div>
-
-      <div>Температура</div><div id="tempVal">-- °C</div>
-      <div>Скорость</div><div id="speedNow">-- м/с</div>
-      <div>Расстояние</div><div id="rangeVal">-- см</div>
-      <div>Сеть</div><div id="netVal">WS: —</div>
-      <div>Поза</div><div id="poseVal">x: —, y: —, θ: —</div>
+    <div class="card" id="historyCard" style="display: none;"> <h3>📜 История входов</h3>
+    <div class="table-container">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Время</th>
+                    <th>IP</th>
+                    <th>Логин</th>
+                    <th>Статус</th>
+                </tr>
+            </thead>
+            <tbody id="loginHistoryBody">
+                </tbody>
+        </table>
     </div>
+    <button class="btn-small" onclick="loadLoginHistory()">Обновить</button>
+</div>
 
-    <h3>Датчики (реал-тайм)</h3>
-    <canvas id="chart" width="340" height="120"></canvas>
-
-    <div class="poll">
-      <button id="refresh">Обновить</button>
-      <label><input id="autopoll" type="checkbox" checked /> Автообновление</label>
+<div class="card" id="userManageCard" style="display: none;">
+    <div class="card-header">
+        <h3>👥 Пользователи</h3>
+        <button class="btn-add" onclick="showUserModal()">+ Добавить</button>
     </div>
+    <div class="user-list" id="usersList">
+        </div>
+</div>
+
+<div id="userModal" class="modal">
+    <div class="modal-content">
+        <h3 id="userModalTitle">Новый пользователь</h3>
+        <input type="hidden" id="editUserId">
+        <input type="text" id="newLogin" placeholder="Логин" class="input-field">
+        <input type="password" id="newPass" placeholder="Пароль" class="input-field">
+        <select id="newRole" class="input-field">
+            <option value="user">Пользователь</option>
+            <option value="admin">Администратор</option>
+        </select>
+        <div class="modal-buttons">
+            <button onclick="saveUser()" class="btn-confirm">Сохранить</button>
+            <button onclick="closeUserModal()" class="btn-cancel">Отмена</button>
+        </div>
+    </div>
+</div>
   </section>
 
   

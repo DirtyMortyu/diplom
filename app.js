@@ -116,16 +116,132 @@ function logout() {
     localStorage.removeItem("user");
     location.reload();
 }
+// ======= АДМИНКА: ИСТОРИЯ ВХОДОВ =======
+async function loadLoginHistory() {
+    const tbody = $("#loginHistoryBody");
+    tbody.innerHTML = "<tr><td colspan='4'>Загрузка...</td></tr>";
+
+    try {
+        // Здесь должен быть запрос к твоему серверу
+        const response = await fetch(`${apiBase}/api/logs`);
+        const logs = await response.json();
+
+        tbody.innerHTML = "";
+        logs.forEach(log => {
+            const row = `
+                <tr>
+                    <td>${new Date(log.timestamp).toLocaleString()}</td>
+                    <td>${log.ip || "Unknown"}</td>
+                    <td>${log.login}</td>
+                    <td style="color:${log.success ? '#4caf50' : '#f44336'}">
+                        ${log.success ? 'Успех' : 'Ошибка'}
+                    </td>
+                </tr>
+            `;
+            tbody.innerHTML += row;
+        });
+    } catch (e) {
+        tbody.innerHTML = "<tr><td colspan='4'>Ошибка загрузки логов</td></tr>";
+        console.error(e);
+    }
+}
+
+// ======= АДМИНКА: ПОЛЬЗОВАТЕЛИ =======
+async function loadUsers() {
+    const list = $("#usersList");
+    list.innerHTML = "Загрузка...";
+    
+    try {
+        const res = await fetch(`${apiBase}/api/users`);
+        const users = await res.json();
+        
+        list.innerHTML = "";
+        users.forEach(u => {
+            const div = document.createElement("div");
+            div.className = "user-item";
+            div.innerHTML = `
+                <span>
+                    <strong>${u.login}</strong> 
+                    <small style="color:#888">(${u.role})</small>
+                </span>
+                <div class="user-actions">
+                    <button class="btn-edit" onclick="editUser('${u.id}', '${u.login}', '${u.role}')">✏️</button>
+                    <button class="btn-delete" onclick="deleteUser('${u.id}')">🗑️</button>
+                </div>
+            `;
+            list.appendChild(div);
+        });
+    } catch (e) {
+        list.innerHTML = "Ошибка загрузки пользователей";
+    }
+}
+
+// Удаление
+async function deleteUser(id) {
+    if(!confirm("Удалить пользователя?")) return;
+    await fetch(`${apiBase}/api/users/${id}`, { method: 'DELETE' });
+    loadUsers();
+}
+
+// Модальное окно и сохранение
+function showUserModal() {
+    $("#userModal").style.display = "flex";
+    $("#userModalTitle").innerText = "Новый пользователь";
+    $("#editUserId").value = "";
+    $("#newLogin").value = "";
+    $("#newPass").value = "";
+}
+
+function editUser(id, login, role) {
+    $("#userModal").style.display = "flex";
+    $("#userModalTitle").innerText = "Редактирование";
+    $("#editUserId").value = id;
+    $("#newLogin").value = login;
+    $("#newRole").value = role;
+    $("#newPass").value = ""; // Пароль не показываем, заполнять если менять
+}
+
+function closeUserModal() { $("#userModal").style.display = "none"; }
+
+async function saveUser() {
+    const id = $("#editUserId").value;
+    const login = $("#newLogin").value;
+    const password = $("#newPass").value;
+    const role = $("#newRole").value;
+
+    const url = id ? `${apiBase}/api/users/${id}` : `${apiBase}/api/users`;
+    const method = id ? 'PUT' : 'POST';
+
+    await fetch(url, {
+        method: method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ login, password, role })
+    });
+
+    closeUserModal();
+    loadUsers();
+}
 
 function loadUserPanel() {
-    const mainContent = $(".grid");
-    if (currentUser?.role === "user") {
-        $(".brand strong").textContent = "RoboPanel - User";
-        $(".status").style.display = "none";
-        $(".tasks").style.display = "none";
-        $(".logs").style.display = "none";
-        mainContent.style.gridTemplateColumns = "1fr 1fr";
+    // Скрываем/показываем блоки в зависимости от роли
+    if (currentUser?.role === "admin") {
+        $(".brand strong").textContent = "Admin Panel";
+        
+        // Показываем админские блоки
+        $("#historyCard").style.display = "block";
+        $("#userManageCard").style.display = "block";
+        
+        // Загружаем данные
+        loadLoginHistory();
+        loadUsers();
+    } else {
+        // Обычный юзер
+        $(".brand strong").textContent = "RoboPanel";
+        $("#historyCard").style.display = "none";
+        $("#userManageCard").style.display = "none";
     }
+
+    // Кнопка выхода (как было)
     if (!$("#logoutBtn")) {
         const btn = document.createElement("button");
         btn.id = "logoutBtn";
