@@ -165,8 +165,8 @@ async function loadUsers() {
                     <small style="color:#888">(${u.role})</small>
                 </span>
                 <div class="user-actions">
-                    <button class="btn-edit" onclick="editUser('${u.id}', '${u.login}', '${u.role}')">✏️</button>
-                    <button class="btn-delete" onclick="deleteUser('${u.id}')">🗑️</button>
+                    <button class="btn-edit" onclick="editUser('${u.idUsers}', '${u.login}', '${u.role}')">✏️</button>
+                    <button class="btn-delete" onclick="deleteUser('${u.idUsers}')">🗑️</button>
                 </div>
             `;
             list.appendChild(div);
@@ -177,9 +177,9 @@ async function loadUsers() {
 }
 
 // Удаление
-async function deleteUser(id) {
+async function deleteUser(idUsers) {
     if(!confirm("Удалить пользователя?")) return;
-    await fetch(`${apiBase}/api/users/${id}`, { method: 'DELETE' });
+    await fetch(`${apiBase}/api/users/${idUsers}`, { method: 'DELETE' });
     loadUsers();
 }
 
@@ -192,10 +192,10 @@ function showUserModal() {
     $("#newPass").value = "";
 }
 
-function editUser(id, login, role) {
+function editUser(idUsers, login, role) {
     $("#userModal").style.display = "flex";
     $("#userModalTitle").innerText = "Редактирование";
-    $("#editUserId").value = id;
+    $("#editUserId").value = idUsers;
     $("#newLogin").value = login;
     $("#newRole").value = role;
     $("#newPass").value = ""; // Пароль не показываем, заполнять если менять
@@ -209,7 +209,7 @@ async function saveUser() {
     const password = $("#newPass").value;
     const role = $("#newRole").value;
 
-    const url = id ? `${apiBase}/api/users/${id}` : `${apiBase}/api/users`;
+    const url = id ? `${apiBase}/api/users/${idUsers}` : `${apiBase}/api/users`;
     const method = id ? 'PUT' : 'POST';
 
     await fetch(url, {
