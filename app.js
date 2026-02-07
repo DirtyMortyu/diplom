@@ -3,29 +3,17 @@ const $ = sel => document.querySelector(sel);
 const logBox = $("#log");
 
 // ======= УЛЬТИМАТИВНЫЙ КОННЕКТ MQTT =======
-const mqttClient = mqtt.connect('wss://t1c0c0c1.ala.eu-central-1.emqxsl.com:8084/mqtt', {
-    clientId: 'web_' + Math.random().toString(16).slice(2, 8),
-    username: 'rover',    
-    password: 'rover123', 
-    clean: true,
-    connectTimeout: 4000,
-    reconnectPeriod: 1000,
-});
+const options = {
+    protocol: 'ws', // Обязательно ws (Websocket)
+    host: '91.222.238.6',
+    port: 9001,
+    path: '/mqtt', // Обычно Mosquitto понимает этот путь
+    username: 'rover',
+    password: 'rover123',
+    clientId: 'web_' + Math.random().toString(16).substr(2, 8)
+};
 
-mqttClient.on('connect', () => {
-    console.log("✅ MQTT ПОДКЛЮЧЕН!");
-    log("Связь с облаком установлена", "net");
-    mqttClient.subscribe('dirtymortyu/rover/status');
-});
-
-mqttClient.on('reconnect', () => {
-    console.log("🔄 Переподключение к MQTT...");
-});
-
-mqttClient.on('error', (err) => {
-    console.error("❌ Ошибка MQTT:", err);
-    log("Ошибка связи", "net");
-});
+const client = mqtt.connect(`ws://${options.host}:${options.port}`, options);
 
 function log(msg, cat = "misc") {
     const ts = new Date().toLocaleTimeString();
@@ -63,13 +51,13 @@ async function sendESPCommand(cmd) {
         return;
     }
 
-    if (!mqttClient.connected) {
+    if (!client.connected) {
         log("Ошибка: Нет связи с MQTT!", "net");
         return;
     }
 
     const topic = 'dirtymortyu/rover/cmd';
-    mqttClient.publish(topic, espCmd, { qos: 0 });
+    client.publish(topic, espCmd, { qos: 0 });
     log(`Облако -> ${espCmd}`, "motor");
 }
 
@@ -269,8 +257,149 @@ document.querySelectorAll(".btn").forEach(b => {
     b.addEventListener("mouseup", stopESP);
 });
 
-// Клавиатура, Джойстик и прочее (оставлено без изменений)
-// ... (твой код джойстика и старта окна) ...
+// ======= УПРАВЛЕНИЕ (КНОПКИ И КЛАВИАТУРА) =======
+
+document.querySelectorAll(".btn").forEach(b => {
+
+    b.addEventListener("mousedown", () => sendESPCommand(b.dataset.cmd));
+
+    b.addEventListener("mouseup", stopESP);
+
+});
+
+
+
+let kbEnabled = false;
+
+$("#kbBtn").onclick = () => {
+
+    kbEnabled = !kbEnabled;
+
+    $("#kbBtn").textContent = kbEnabled ? "Клава: ВКЛ" : "Клава: ВЫКЛ";
+
+};
+
+
+
+const keyMap = {
+
+    "w": "forward", "ArrowUp": "forward",
+
+    "s": "backward", "ArrowDown": "backward",
+
+    "a": "left", "ArrowLeft": "left",
+
+    "d": "right", "ArrowRight": "right",
+
+    " ": "stop"
+
+};
+
+
+
+document.addEventListener("keydown", e => {
+
+    if (kbEnabled && keyMap[e.key] && currentCmd !== keyMap[e.key]) {
+
+        currentCmd = keyMap[e.key];
+
+        sendESPCommand(currentCmd);
+
+    }
+
+});
+
+
+
+document.addEventListener("keyup", e => {
+
+    if (kbEnabled && keyMap[e.key]) {
+
+        currentCmd = "STOP";
+
+        stopESP();
+
+    }
+
+});
+
+
+
+// ======= ДЖОЙСТИК =======
+
+const joy = $("#joystick"), jctx = joy.getContext("2d");
+
+const center = {x: joy.width/2, y: joy.height/2};
+
+let dragging = false, knob = {...center};
+
+
+
+function drawJoy() {
+
+    jctx.clearRect(0,0,joy.width,joy.height);
+
+    jctx.beginPath(); jctx.arc(center.x, center.y, 80, 0, Math.PI*2);
+
+    jctx.strokeStyle = "#2a3140"; jctx.stroke();
+
+    jctx.beginPath(); jctx.arc(knob.x, knob.y, 25, 0, Math.PI*2);
+
+    jctx.fillStyle = "#3ea6ff"; jctx.fill();
+
+}
+
+
+
+function handleJoy(e) {
+
+    if (!dragging) return;
+
+    const rect = joy.getBoundingClientRect();
+
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+
+    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+
+    const dx = x - center.x, dy = y - center.y;
+
+    const mag = Math.hypot(dx, dy);
+
+   
+
+    knob = mag > 80 ? {x: center.x + dx*80/mag, y: center.y + dy*80/mag} : {x, y};
+
+    drawJoy();
+
+
+
+    let newCmd = "stop";
+
+    if (mag > 30) {
+
+        if (Math.abs(dx) > Math.abs(dy)) newCmd = dx > 0 ? "right" : "left";
+
+        else newCmd = dy < 0 ? "forward" : "backward";
+
+    }
+
+    if (newCmd !== currentCmd) {
+
+        currentCmd = newCmd;
+
+        sendESPCommand(currentCmd);
+
+    }
+
+}
+
+
+
+joy.addEventListener("mousedown", () => dragging = true);
+
+document.addEventListener("mousemove", handleJoy);
+
+document.addEventListener("mouseup", () => { dragging = false; knob = {...center}; drawJoy(); stopESP(); currentCmd="STOP"; });
 
 window.onload = () => {
     if (typeof drawJoy === "function") drawJoy();
