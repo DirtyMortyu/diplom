@@ -179,12 +179,12 @@ async function loadUsers() {
 
 // ======= СОХРАНЕНИЕ ЮЗЕРА =======
 async function saveUser() {
-    const idUsers = $("#editUserId").value; // Это ID для редактирования
+    const idUsers = $("#editUserId").value; 
     const login = $("#newLogin").value;
-    const password = $("#newPass").value; // В бэкенде мы добавили проверку 'password'
+    const password = $("#newPass").value; 
     const role = $("#newRole").value;
 
-    // ИСПРАВЛЕНО: заменено id на idUsers
+    // Исправлено: используем idUsers для проверки
     const url = idUsers ? `${apiBase}/api/users/${idUsers}` : `${apiBase}/api/users`;
     const method = idUsers ? 'PUT' : 'POST';
 
