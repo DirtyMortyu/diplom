@@ -67,7 +67,7 @@ async function sendESPCommand(cmd) {
     }
 
     if (!mqttClient.connected) {
-        log("Ошибка: Нет связи с брокером!", "net");
+        log("Ошибка: Нет связи с mqtt, render!", "net");
         return;
     }
 
@@ -122,15 +122,16 @@ async function loadLoginHistory() {
     tbody.innerHTML = "<tr><td colspan='4'>Загрузка...</td></tr>";
 
     try {
-        // Здесь должен быть запрос к твоему серверу
         const response = await fetch(`${apiBase}/api/logs`);
         const logs = await response.json();
 
         tbody.innerHTML = "";
         logs.forEach(log => {
+            // ИСПРАВЛЕНО: используем created_at вместо timestamp
+            const dateStr = log.created_at ? new Date(log.created_at).toLocaleString() : "---";
             const row = `
                 <tr>
-                    <td>${new Date(log.timestamp).toLocaleString()}</td>
+                    <td>${dateStr}</td>
                     <td>${log.ip || "Unknown"}</td>
                     <td>${log.login}</td>
                     <td style="color:${log.success ? '#4caf50' : '#f44336'}">
@@ -142,7 +143,6 @@ async function loadLoginHistory() {
         });
     } catch (e) {
         tbody.innerHTML = "<tr><td colspan='4'>Ошибка загрузки логов</td></tr>";
-        console.error(e);
     }
 }
 
@@ -159,20 +159,51 @@ async function loadUsers() {
         users.forEach(u => {
             const div = document.createElement("div");
             div.className = "user-item";
+            // ИСПРАВЛЕНО: используем u.id, так как в SQL было "as id"
             div.innerHTML = `
                 <span>
                     <strong>${u.login}</strong> 
                     <small style="color:#888">(${u.role})</small>
                 </span>
                 <div class="user-actions">
-                    <button class="btn-edit" onclick="editUser('${u.idUsers}', '${u.login}', '${u.role}')">✏️</button>
-                    <button class="btn-delete" onclick="deleteUser('${u.idUsers}')">🗑️</button>
+                    <button class="btn-edit" onclick="editUser('${u.id}', '${u.login}', '${u.role}')">✏️</button>
+                    <button class="btn-delete" onclick="deleteUser('${u.id}')">🗑️</button>
                 </div>
             `;
             list.appendChild(div);
         });
     } catch (e) {
         list.innerHTML = "Ошибка загрузки пользователей";
+    }
+}
+
+// ======= СОХРАНЕНИЕ ЮЗЕРА =======
+async function saveUser() {
+    const idUsers = $("#editUserId").value; // Это ID для редактирования
+    const login = $("#newLogin").value;
+    const password = $("#newPass").value; // В бэкенде мы добавили проверку 'password'
+    const role = $("#newRole").value;
+
+    // ИСПРАВЛЕНО: заменено id на idUsers
+    const url = idUsers ? `${apiBase}/api/users/${idUsers}` : `${apiBase}/api/users`;
+    const method = idUsers ? 'PUT' : 'POST';
+
+    try {
+        const response = await fetch(url, {
+            method: method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ login, password, role })
+        });
+        
+        if (response.ok) {
+            closeUserModal();
+            loadUsers();
+        } else {
+            const err = await response.json();
+            alert("Ошибка: " + err.message);
+        }
+    } catch (e) {
+        alert("Ошибка сети");
     }
 }
 
