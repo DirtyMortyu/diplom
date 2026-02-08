@@ -11,11 +11,34 @@ const client = mqtt.connect('wss://rover-pgk.duckdns.org:9001/mqtt', {
 });
 
 client.on('connect', () => {
-    console.log('MQTT подключён по WSS!');
+    console.log('✅ MQTT подключён по WSS!');
+    log('MQTT подключён!', 'net');
+    // Подписываемся на топик для диагностики
+    client.subscribe('dirtymortyu/rover/cmd', (err) => {
+        if (!err) {
+            console.log('✅ Подписка на топик успешна');
+            log('Подписка на топик OK', 'net');
+        }
+    });
+});
+
+client.on('message', (topic, message) => {
+    console.log('📩 Получено из MQTT:', topic, message.toString());
+    log(`Echo: ${message.toString()}`, 'net');
 });
 
 client.on('error', (err) => {
-    console.error('Ошибка MQTT:', err);
+    console.error('❌ Ошибка MQTT:', err);
+    log('Ошибка MQTT: ' + err.message, 'net');
+});
+
+client.on('offline', () => {
+    console.warn('⚠️ MQTT отключён');
+    log('MQTT отключён', 'net');
+});
+
+client.on('reconnect', () => {
+    console.log('🔄 MQTT переподключение...');
 });
 
 
@@ -408,7 +431,16 @@ document.addEventListener("mouseup", () => { dragging = false; knob = {...center
 window.onload = () => {
     if (typeof drawJoy === "function") drawJoy();
     if ($("#loginSubmitBtn")) $("#loginSubmitBtn").onclick = login;
+
+    // Обработчик Demo Mode
+    if ($("#demoToggle")) {
+        $("#demoToggle").onchange = (e) => {
+            demo = e.target.checked;
+            log(demo ? "Demo Mode ВКЛ" : "Demo Mode ВЫКЛ", "misc");
+        };
+    }
+
     const saved = localStorage.getItem("user");
-    if (saved) { currentUser = JSON.parse(saved); loadUserPanel(); } 
+    if (saved) { currentUser = JSON.parse(saved); loadUserPanel(); }
     else showLoginModal();
 };
