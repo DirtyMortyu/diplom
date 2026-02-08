@@ -278,20 +278,11 @@ function loadUserPanel() {
     }
 }
 
-// ======= УПРАВЛЕНИЕ =======
-document.querySelectorAll(".btn").forEach(b => {
+// ======= УПРАВЛЕНИЕ КНОПКАМИ =======
+document.querySelectorAll(".btn[data-cmd]").forEach(b => {
     b.addEventListener("mousedown", () => sendESPCommand(b.dataset.cmd));
     b.addEventListener("mouseup", stopESP);
-});
-
-// ======= УПРАВЛЕНИЕ (КНОПКИ И КЛАВИАТУРА) =======
-
-document.querySelectorAll(".btn").forEach(b => {
-
-    b.addEventListener("mousedown", () => sendESPCommand(b.dataset.cmd));
-
-    b.addEventListener("mouseup", stopESP);
-
+    b.addEventListener("mouseleave", stopESP); // Останавливаем если увели курсор
 });
 
 
@@ -299,11 +290,10 @@ document.querySelectorAll(".btn").forEach(b => {
 let kbEnabled = false;
 
 $("#kbBtn").onclick = () => {
-
     kbEnabled = !kbEnabled;
-
     $("#kbBtn").textContent = kbEnabled ? "Клава: ВКЛ" : "Клава: ВЫКЛ";
-
+    $("#kbStatus").textContent = kbEnabled ? "Режим: включен ✅" : "Режим: выключен";
+    log(kbEnabled ? "Клавиатура ВКЛ" : "Клавиатура ВЫКЛ", "misc");
 };
 
 
@@ -422,11 +412,34 @@ function handleJoy(e) {
 
 
 
+// Поддержка мыши
 joy.addEventListener("mousedown", () => dragging = true);
-
 document.addEventListener("mousemove", handleJoy);
+document.addEventListener("mouseup", () => {
+    dragging = false;
+    knob = {...center};
+    drawJoy();
+    stopESP();
+    currentCmd="STOP";
+});
 
-document.addEventListener("mouseup", () => { dragging = false; knob = {...center}; drawJoy(); stopESP(); currentCmd="STOP"; });
+// Поддержка сенсорных экранов
+joy.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    dragging = true;
+    handleJoy(e);
+});
+document.addEventListener("touchmove", (e) => {
+    e.preventDefault();
+    handleJoy(e);
+});
+document.addEventListener("touchend", () => {
+    dragging = false;
+    knob = {...center};
+    drawJoy();
+    stopESP();
+    currentCmd = "STOP";
+});
 
 window.onload = () => {
     if (typeof drawJoy === "function") drawJoy();
@@ -439,6 +452,32 @@ window.onload = () => {
             log(demo ? "Demo Mode ВКЛ" : "Demo Mode ВЫКЛ", "misc");
         };
     }
+
+    // Видео стрим
+    if ($("#streamStart")) {
+        $("#streamStart").onclick = () => {
+            const url = $("#streamUrl").value;
+            $("#stream").src = url;
+            log("Видео запущено: " + url, "misc");
+        };
+    }
+    if ($("#streamStop")) {
+        $("#streamStop").onclick = () => {
+            $("#stream").src = "";
+            log("Видео остановлено", "misc");
+        };
+    }
+
+    // Миссии
+    document.querySelectorAll("[data-mission]").forEach(btn => {
+        btn.onclick = () => {
+            const mission = btn.dataset.mission;
+            if (mission === "square") {
+                sendESPCommand("TURN360");
+                log("Миссия: поворот 360°", "motor");
+            }
+        };
+    });
 
     const saved = localStorage.getItem("user");
     if (saved) { currentUser = JSON.parse(saved); loadUserPanel(); }

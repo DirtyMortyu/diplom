@@ -2,7 +2,6 @@ from flask import Flask, request, jsonify
 import pymysql.cursors
 from flask_cors import CORS
 import os
-import datetime
 
 app = Flask(__name__)
 CORS(app)
@@ -23,9 +22,16 @@ def get_db_connection():
 # 1. ЛОГИН
 @app.route("/api/login", methods=["POST"])
 def login():
-    data = request.json
-    login_input = data.get("login")
-    password_input = data.get("password")
+    data = request.json or {}
+    login_input = data.get("login", "").strip()
+    password_input = data.get("password", "")
+
+    # Валидация входных данных
+    if not login_input or not password_input:
+        return jsonify({"success": False, "message": "Логин и пароль обязательны"}), 400
+
+    if len(login_input) > 50:
+        return jsonify({"success": False, "message": "Логин слишком длинный"}), 400
 
     connection = None
     try:
@@ -112,11 +118,21 @@ def get_users():
 @app.route("/api/users", methods=["POST"])
 @app.route("/api/users/<int:user_id>", methods=["PUT"])
 def manage_user(user_id=None):
-    data = request.json
-    login_val = data.get("login")
+    data = request.json or {}
+    login_val = data.get("login", "").strip()
     # Проверяем и Password и password на случай разного фронтенда
     password_val = data.get("password") or data.get("Password")
     role_name = data.get("role", "user")
+
+    # Валидация
+    if not login_val:
+        return jsonify({"success": False, "message": "Логин обязателен"}), 400
+
+    if len(login_val) > 50:
+        return jsonify({"success": False, "message": "Логин слишком длинный"}), 400
+
+    if role_name not in ["user", "admin"]:
+        return jsonify({"success": False, "message": "Недопустимая роль"}), 400
 
     connection = None
     try:
@@ -154,10 +170,18 @@ def manage_user(user_id=None):
 # 5. УДАЛЕНИЕ
 @app.route("/api/users/<int:user_id>", methods=["DELETE"])
 def delete_user(user_id):
+    if not user_id or user_id <= 0:
+        return jsonify({"success": False, "message": "Некорректный ID"}), 400
+
     connection = None
     try:
         connection = get_db_connection()
         with connection.cursor() as cursor:
+            # Проверяем что пользователь существует
+            cursor.execute("SELECT idUsers FROM Users WHERE idUsers=%s", (user_id,))
+            if not cursor.fetchone():
+                return jsonify({"success": False, "message": "Пользователь не найден"}), 404
+
             cursor.execute("DELETE FROM Users WHERE idUsers=%s", (user_id,))
             connection.commit()
             return jsonify({"success": True})

@@ -39,6 +39,7 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
   else if (strcmp(msgBuffer, "LEFT") == 0)     sendCommand("LEFT");
   else if (strcmp(msgBuffer, "RIGHT") == 0)    sendCommand("RIGHT");
   else if (strcmp(msgBuffer, "STOP") == 0)     sendCommand("STOP");
+  else if (strcmp(msgBuffer, "TURN360") == 0)  sendCommand("TURN360");
   
   Serial.print("[MQTT] In: "); Serial.println(msgBuffer);
   Serial.print("[Mem] Free: "); Serial.println(ESP.getFreeHeap());
