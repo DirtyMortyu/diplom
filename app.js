@@ -133,7 +133,6 @@ function logout() {
 async function loadLoginHistory() {
     const tbody = $("#loginHistoryBody");
     if (!tbody) return;
-    tbody.innerHTML = "<tr><td colspan='4'>Загрузка...</td></tr>";
 
     try {
         const response = await fetch(`${apiBase}/api/logs`);
@@ -154,6 +153,12 @@ async function loadLoginHistory() {
             `;
             tbody.innerHTML += row;
         });
+
+        // Обновляем время последнего обновления
+        const updateTime = document.querySelector("#lastUpdateTime");
+        if (updateTime) {
+            updateTime.textContent = new Date().toLocaleTimeString();
+        }
     } catch (e) {
         tbody.innerHTML = "<tr><td colspan='4'>Ошибка загрузки логов</td></tr>";
     }
@@ -255,6 +260,9 @@ async function deleteUser(id) {
     } catch (e) { console.error(e); }
 }
 
+// Глобальная переменная для таймера
+let historyUpdateTimer = null;
+
 function loadUserPanel() {
     if (currentUser?.role === "admin") {
         $(".brand strong").textContent = "Admin Panel";
@@ -262,10 +270,28 @@ function loadUserPanel() {
         $("#userManageCard").style.display = "block";
         loadLoginHistory();
         loadUsers();
+
+        // Автообновление истории входов каждые 10 секунд
+        if (historyUpdateTimer) clearInterval(historyUpdateTimer);
+        historyUpdateTimer = setInterval(() => {
+            if (currentUser?.role === "admin") {
+                loadLoginHistory();
+            } else {
+                clearInterval(historyUpdateTimer);
+            }
+        }, 10000); // 10 секунд
+
+        log("Автообновление истории: ВКЛ (каждые 10 сек)", "misc");
     } else {
         $(".brand strong").textContent = "RoboPanel";
         if ($("#historyCard")) $("#historyCard").style.display = "none";
         if ($("#userManageCard")) $("#userManageCard").style.display = "none";
+
+        // Останавливаем таймер для обычных пользователей
+        if (historyUpdateTimer) {
+            clearInterval(historyUpdateTimer);
+            historyUpdateTimer = null;
+        }
     }
 
     if (!$("#logoutBtn")) {

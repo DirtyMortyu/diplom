@@ -87,23 +87,28 @@
 
   <!-- ПРАВАЯ КОЛОНКА -->
   <section class="card status">
-    <div class="card" id="historyCard" style="display: none;"> <h3>📜 История входов</h3>
-    <div class="table-container">
-        <table class="admin-table">
-            <thead>
-                <tr>
-                    <th>Время</th>
-                    <th>IP</th>
-                    <th>Логин</th>
-                    <th>Статус</th>
-                </tr>
-            </thead>
-            <tbody id="loginHistoryBody">
+    <div class="card" id="historyCard" style="display: none;">
+        <h3>📜 История входов</h3>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <small style="color: #888;">Обновление: <span id="lastUpdateTime">--:--:--</span></small>
+            <small style="color: #4ad97a;">🔄 Автообновление: каждые 10 сек</small>
+        </div>
+        <div class="table-container">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Время</th>
+                        <th>IP</th>
+                        <th>Логин</th>
+                        <th>Статус</th>
+                    </tr>
+                </thead>
+                <tbody id="loginHistoryBody">
                 </tbody>
-        </table>
+            </table>
+        </div>
+        <button class="btn-small" onclick="loadLoginHistory()">Обновить сейчас</button>
     </div>
-    <button class="btn-small" onclick="loadLoginHistory()">Обновить</button>
-</div>
 
 <div class="card" id="userManageCard" style="display: none;">
     <div class="card-header">

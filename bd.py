@@ -19,6 +19,18 @@ db_config = {
 def get_db_connection():
     return pymysql.connect(**db_config)
 
+def get_client_ip():
+    """Получает реальный IP клиента с учетом прокси"""
+    # Проверяем заголовки прокси (Nginx, Cloudflare, etc)
+    if request.headers.get('X-Forwarded-For'):
+        # X-Forwarded-For может содержать несколько IP через запятую
+        # Берем первый (реальный клиент)
+        return request.headers.get('X-Forwarded-For').split(',')[0].strip()
+    elif request.headers.get('X-Real-IP'):
+        return request.headers.get('X-Real-IP')
+    else:
+        return request.remote_addr
+
 # 1. ЛОГИН
 @app.route("/api/login", methods=["POST"])
 def login():
@@ -52,7 +64,7 @@ def login():
             sql_log = "INSERT INTO history_login (user_id, ipadress, success, user_agent) VALUES (%s, %s, %s, %s)"
             cursor.execute(sql_log, (
                 user["idUsers"] if user else None,
-                request.remote_addr,
+                get_client_ip(),  # Используем функцию для получения реального IP
                 1 if success else 0,
                 request.headers.get("User-Agent")
             ))
