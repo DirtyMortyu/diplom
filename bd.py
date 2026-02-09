@@ -1,10 +1,26 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 import pymysql.cursors
 from flask_cors import CORS
 import os
+import paho.mqtt.client as mqtt
+import base64
+import threading
+import time
 
 app = Flask(__name__)
 CORS(app)
+
+# ========== MQTT для камеры ==========
+MQTT_BROKER = "rover-pgk.duckdns.org"
+MQTT_PORT = 1883
+MQTT_USER = "rover"
+MQTT_PASSWORD = "rover123"
+MQTT_CAMERA_TOPIC = "dirtymortyu/rover/camera"
+
+# Глобальная переменная для хранения последнего кадра
+latest_frame = None
+frame_lock = threading.Lock()
+frame_timestamp = 0
 
 # === Настройки подключения к БД ===
 db_config = {
@@ -201,6 +217,96 @@ def delete_user(user_id):
         return jsonify({"success": False, "message": str(e)}), 500
     finally:
         if connection: connection.close()
+
+# ========== MQTT обработчики ==========
+def on_mqtt_connect(client, userdata, flags, rc):
+    """Callback при подключении к MQTT"""
+    if rc == 0:
+        print(f"✅ MQTT Connected to {MQTT_BROKER}")
+        client.subscribe(MQTT_CAMERA_TOPIC)
+        print(f"📡 Subscribed to: {MQTT_CAMERA_TOPIC}")
+    else:
+        print(f"❌ MQTT Connection failed with code {rc}")
+
+def on_mqtt_message(client, userdata, msg):
+    """Callback при получении сообщения из MQTT"""
+    global latest_frame, frame_timestamp
+    try:
+        # Декодируем Base64 обратно в JPEG
+        jpeg_data = base64.b64decode(msg.payload)
+
+        with frame_lock:
+            latest_frame = jpeg_data
+            frame_timestamp = time.time()
+
+        print(f"📸 Frame received: {len(jpeg_data)} bytes")
+    except Exception as e:
+        print(f"❌ Error decoding frame: {e}")
+
+def start_mqtt_client():
+    """Запускает MQTT клиент в отдельном потоке"""
+    mqtt_client = mqtt.Client(client_id="Flask_Camera_" + str(os.getpid()))
+    mqtt_client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
+    mqtt_client.on_connect = on_mqtt_connect
+    mqtt_client.on_message = on_mqtt_message
+
+    try:
+        mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
+        mqtt_client.loop_forever()
+    except Exception as e:
+        print(f"❌ MQTT Client error: {e}")
+        time.sleep(5)
+        start_mqtt_client()  # Переподключение при ошибке
+
+# Запускаем MQTT клиент в отдельном потоке
+mqtt_thread = threading.Thread(target=start_mqtt_client, daemon=True)
+mqtt_thread.start()
+print("🚀 MQTT client started in background thread")
+
+# ========== API Endpoint для камеры ==========
+@app.route("/api/camera/stream")
+def camera_stream():
+    """MJPEG стрим из MQTT снапшотов"""
+    def generate():
+        last_sent_timestamp = 0
+        no_frame_count = 0
+
+        while True:
+            with frame_lock:
+                current_frame = latest_frame
+                current_timestamp = frame_timestamp
+
+            # Проверяем что есть новый кадр
+            if current_frame and current_timestamp > last_sent_timestamp:
+                # Формируем MJPEG кадр
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + current_frame + b'\r\n')
+                last_sent_timestamp = current_timestamp
+                no_frame_count = 0
+            else:
+                # Если долго нет кадров, отправляем заглушку
+                no_frame_count += 1
+                if no_frame_count > 50:  # ~5 секунд без кадров
+                    print("⚠️ No frames received for 5 seconds")
+                    no_frame_count = 0
+
+            time.sleep(0.1)  # 10 FPS максимум
+
+    return Response(generate(),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route("/api/camera/status")
+def camera_status():
+    """Статус камеры"""
+    with frame_lock:
+        has_frame = latest_frame is not None
+        last_update = time.time() - frame_timestamp if frame_timestamp > 0 else None
+
+    return jsonify({
+        "connected": has_frame,
+        "last_frame_ago": last_update,
+        "mqtt_topic": MQTT_CAMERA_TOPIC
+    })
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

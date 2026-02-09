@@ -73,15 +73,14 @@
   <section class="card video">
     <h2>Видео</h2>
     <div class="videoWrap">
-      <img id="stream" src="" alt="Video Stream (MJPEG)" />
+      <img id="stream" src="" alt="Video Stream (MQTT)" />
       <div class="videoBar">
-        <input id="streamUrl" type="text" value="http://localhost:8000/stream.mjpg" />
-        <button id="streamStart">Старт</button>
-        <button id="streamStop">Стоп</button>
-        <input id="tgCaption" type="text" placeholder="Подпись к фото в TG" />
-        <button id="tgShot">Снимок в Telegram</button>
-
+        <button id="streamStart">▶️ Включить камеру</button>
+        <button id="streamStop">⏹️ Выключить камеру</button>
       </div>
+      <small style="color: var(--sub); margin-top: 8px; display: block;">
+        📡 Камера подключается через MQTT автоматически. Убедитесь что ESP32-CAM включена и подключена к WiFi.
+      </small>
     </div>
   </section>
 

@@ -479,12 +479,25 @@ window.onload = () => {
         };
     }
 
-    // Видео стрим
+    // Видео стрим через Flask API
     if ($("#streamStart")) {
         $("#streamStart").onclick = () => {
-            const url = $("#streamUrl").value;
-            $("#stream").src = url;
-            log("Видео запущено: " + url, "misc");
+            // Используем Flask endpoint для стрима через MQTT
+            const streamUrl = `${apiBase}/api/camera/stream`;
+            $("#stream").src = streamUrl;
+            log("Видео запущено через MQTT", "misc");
+
+            // Проверяем статус камеры
+            fetch(`${apiBase}/api/camera/status`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.connected) {
+                        log(`Камера подключена (последний кадр: ${data.last_frame_ago?.toFixed(1)}с назад)`, "net");
+                    } else {
+                        log("⚠️ Камера не подключена к MQTT. Проверьте ESP32-CAM", "net");
+                    }
+                })
+                .catch(err => log("Ошибка проверки статуса камеры", "net"));
         };
     }
     if ($("#streamStop")) {
