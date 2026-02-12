@@ -479,7 +479,7 @@ window.onload = () => {
         };
     }
 
-    // Видео стрим через ESP8266 HTTP прокси
+    // Видео стрим напрямую с ESP32-CAM
     const cameraIpInput = $("#cameraIp");
     const streamImg = $("#stream");
     const streamOverlay = $("#streamOverlay");
@@ -492,12 +492,12 @@ window.onload = () => {
         $("#streamStart").onclick = () => {
             const camIp = cameraIpInput?.value.trim();
             if (!camIp) {
-                alert("Введите IP адрес ESP8266!");
+                alert("Введите IP адрес ESP32-CAM!");
                 return;
             }
 
             localStorage.setItem("cameraIp", camIp);
-            const streamUrl = `http://${camIp}/camera/stream`;
+            const streamUrl = `http://${camIp}/stream`;
             streamImg.src = streamUrl;
             if (streamOverlay) streamOverlay.style.display = "none";
             log(`Видео: подключение к ${streamUrl}`, "net");
@@ -507,7 +507,7 @@ window.onload = () => {
                     streamOverlay.style.display = "flex";
                     streamOverlay.textContent = "Нет сигнала";
                 }
-                log("Камера недоступна. Проверьте IP и подключение ESP8266", "net");
+                log("Камера недоступна. Проверьте IP ESP32-CAM", "net");
             };
             streamImg.onload = () => {
                 log("Видео подключено!", "net");

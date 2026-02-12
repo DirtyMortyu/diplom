@@ -1,17 +1,9 @@
 
 #include "esp_camera.h"
 #include <WiFi.h>
+#include <WiFiManager.h>
+#include <ESPmDNS.h>
 #include "esp_http_server.h"
-
-// ========== WiFi настройки (подключение к ESP8266 AP) ==========
-const char* ssid = "RoverCam";          // WiFi от ESP8266
-const char* password = "rover12345";    // Пароль от ESP8266
-
-// ========== Статический IP для надёжности ==========
-IPAddress local_IP(192, 168, 4, 2);     // IP ESP32-CAM
-IPAddress gateway(192, 168, 4, 1);      // IP ESP8266 (шлюз)
-IPAddress subnet(255, 255, 255, 0);
-IPAddress primaryDNS(8, 8, 8, 8);       // Google DNS (опционально)
 
 // ========== Пины камеры AI-Thinker ==========
 #define PWDN_GPIO_NUM     32
@@ -58,14 +50,14 @@ bool initCamera() {
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
 
-  // Настройки качества для HTTP стрима (хорошее качество)
+  // Настройки качества (VGA для стабильного стрима)
   if (psramFound()) {
-    config.frame_size = FRAMESIZE_SVGA;  // 800x600 (высокое качество)
-    config.jpeg_quality = 10;            // 0-63 (10 = отличное качество)
-    config.fb_count = 2;                 // Двойная буферизация
+    config.frame_size = FRAMESIZE_VGA;   // 640x480 (стабильный стрим)
+    config.jpeg_quality = 12;            // 0-63 (12 = хорошее качество)
+    config.fb_count = 2;
   } else {
-    config.frame_size = FRAMESIZE_VGA;   // 640x480
-    config.jpeg_quality = 12;
+    config.frame_size = FRAMESIZE_CIF;   // 400x296
+    config.jpeg_quality = 16;
     config.fb_count = 1;
   }
 
@@ -307,65 +299,51 @@ void setup() {
   Serial.setDebugOutput(true);
   Serial.println();
   Serial.println("========================================");
-  Serial.println("   ESP32-CAM v2.0 (AP Mode)");
-  Serial.println("   Connects to ESP8266 Access Point");
+  Serial.println("   ESP32-CAM v4.0 (WiFiManager)");
   Serial.println("========================================");
 
   // Инициализация камеры
   if (!initCamera()) {
     Serial.println("❌ CRITICAL: Camera initialization failed!");
-    Serial.println("⚠️ Check camera connections and reset ESP32-CAM");
     return;
   }
 
-  // Настройка статического IP (для надёжности)
-  if (!WiFi.config(local_IP, gateway, subnet, primaryDNS)) {
-    Serial.println("⚠️ Failed to configure static IP");
+  // WiFiManager — автоматическое подключение или портал настройки
+  WiFiManager wm;
+  wm.setConfigPortalTimeout(180);  // 3 мин на настройку, потом перезагрузка
+
+  Serial.println("\n📡 Подключение к WiFi...");
+  Serial.println("Если сеть не найдена — подключитесь к WiFi 'ESP32-CAM-Setup'");
+
+  if (!wm.autoConnect("ESP32-CAM-Setup")) {
+    Serial.println("❌ Не удалось подключиться. Перезагрузка...");
+    ESP.restart();
   }
 
-  // Подключение к WiFi ESP8266
-  Serial.println("\n📡 Connecting to ESP8266 Access Point...");
-  Serial.print("   SSID: "); Serial.println(ssid);
-  
-  WiFi.begin(ssid, password);
-  WiFi.setSleep(false);  // Отключаем энергосбережение
+  WiFi.setSleep(false);
 
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
-    delay(500);
-    Serial.print(".");
-    attempts++;
+  Serial.println("\n✅ WiFi connected!");
+  Serial.print("📍 IP: ");
+  Serial.println(WiFi.localIP());
+  Serial.print("📶 Signal: ");
+  Serial.print(WiFi.RSSI());
+  Serial.println(" dBm");
+
+  startCameraServer();
+
+  // mDNS — камера доступна по http://esp32cam.local
+  if (MDNS.begin("esp32cam")) {
+    Serial.println("✅ mDNS: http://esp32cam.local");
   }
 
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n✅ WiFi connected!");
-    Serial.print("📍 IP Address: ");
-    Serial.println(WiFi.localIP());
-    Serial.print("🌐 Gateway (ESP8266): ");
-    Serial.println(WiFi.gatewayIP());
-    Serial.print("📶 Signal: ");
-    Serial.print(WiFi.RSSI());
-    Serial.println(" dBm");
-
-    // Запуск веб-сервера
-    startCameraServer();
-
-    Serial.println("\n========================================");
-    Serial.println("✅ ESP32-CAM готова к работе!");
-    Serial.println("========================================");
-    Serial.println("🌐 Локальный доступ:");
-    Serial.print("   http://");
-    Serial.println(WiFi.localIP());
-    Serial.println("\n📡 Доступ через ESP8266:");
-    Serial.print("   http://ESP8266_IP/camera/stream\n");
-    Serial.println("========================================\n");
-  } else {
-    Serial.println("\n❌ WiFi connection failed!");
-    Serial.println("⚠️ Проверьте:");
-    Serial.println("   1. ESP8266 раздаёт WiFi 'RoverCam'");
-    Serial.println("   2. Пароль: rover12345");
-    Serial.println("   3. ESP8266 включен и работает");
-  }
+  Serial.println("\n========================================");
+  Serial.println("✅ ESP32-CAM готова к работе!");
+  Serial.println("========================================");
+  Serial.print("   http://");
+  Serial.print(WiFi.localIP());
+  Serial.println("/stream");
+  Serial.println("   http://esp32cam.local/stream");
+  Serial.println("========================================\n");
 }
 
 // ========== LOOP ==========
