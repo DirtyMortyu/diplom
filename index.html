@@ -73,13 +73,20 @@
   <section class="card video">
     <h2>Видео</h2>
     <div class="videoWrap">
-      <img id="stream" src="" alt="Video Stream (MQTT)" />
+      <div class="streamContainer">
+        <img id="stream" src="" alt="Нет сигнала" />
+        <div id="streamOverlay" class="streamOverlay">Нет сигнала</div>
+      </div>
       <div class="videoBar">
-        <button id="streamStart">▶️ Включить камеру</button>
-        <button id="streamStop">⏹️ Выключить камеру</button>
+        <label style="color: var(--sub); font-size: 13px;">
+          IP камеры:
+          <input id="cameraIp" type="text" placeholder="192.168.x.x" value="" />
+        </label>
+        <button id="streamStart">▶ Включить</button>
+        <button id="streamStop">⏹ Выключить</button>
       </div>
       <small style="color: var(--sub); margin-top: 8px; display: block;">
-        📡 Камера подключается через MQTT автоматически. Убедитесь что ESP32-CAM включена и подключена к WiFi.
+        📡 Введите IP ESP8266 из локальной сети. Стрим: <code>/camera/stream</code>
       </small>
     </div>
   </section>

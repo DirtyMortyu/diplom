@@ -479,30 +479,49 @@ window.onload = () => {
         };
     }
 
-    // Видео стрим через Flask API
+    // Видео стрим через ESP8266 HTTP прокси
+    const cameraIpInput = $("#cameraIp");
+    const streamImg = $("#stream");
+    const streamOverlay = $("#streamOverlay");
+
+    // Загружаем сохранённый IP камеры
+    const savedCamIp = localStorage.getItem("cameraIp");
+    if (savedCamIp && cameraIpInput) cameraIpInput.value = savedCamIp;
+
     if ($("#streamStart")) {
         $("#streamStart").onclick = () => {
-            // Используем Flask endpoint для стрима через MQTT
-            const streamUrl = `${apiBase}/api/camera/stream`;
-            $("#stream").src = streamUrl;
-            log("Видео запущено через MQTT", "misc");
+            const camIp = cameraIpInput?.value.trim();
+            if (!camIp) {
+                alert("Введите IP адрес ESP8266!");
+                return;
+            }
 
-            // Проверяем статус камеры
-            fetch(`${apiBase}/api/camera/status`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.connected) {
-                        log(`Камера подключена (последний кадр: ${data.last_frame_ago?.toFixed(1)}с назад)`, "net");
-                    } else {
-                        log("⚠️ Камера не подключена к MQTT. Проверьте ESP32-CAM", "net");
-                    }
-                })
-                .catch(err => log("Ошибка проверки статуса камеры", "net"));
+            localStorage.setItem("cameraIp", camIp);
+            const streamUrl = `http://${camIp}/camera/stream`;
+            streamImg.src = streamUrl;
+            if (streamOverlay) streamOverlay.style.display = "none";
+            log(`Видео: подключение к ${streamUrl}`, "net");
+
+            streamImg.onerror = () => {
+                if (streamOverlay) {
+                    streamOverlay.style.display = "flex";
+                    streamOverlay.textContent = "Нет сигнала";
+                }
+                log("Камера недоступна. Проверьте IP и подключение ESP8266", "net");
+            };
+            streamImg.onload = () => {
+                log("Видео подключено!", "net");
+            };
         };
     }
     if ($("#streamStop")) {
         $("#streamStop").onclick = () => {
-            $("#stream").src = "";
+            streamImg.src = "";
+            streamImg.onerror = null;
+            if (streamOverlay) {
+                streamOverlay.style.display = "flex";
+                streamOverlay.textContent = "Нет сигнала";
+            }
             log("Видео остановлено", "misc");
         };
     }

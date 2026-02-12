@@ -97,9 +97,37 @@ h3{margin:10px 0 8px 0;color:var(--sub);font-weight:600}
 .joyHelp{font-size:12px;color:var(--sub);margin-top:6px}
 
 .video .videoWrap{display:flex;flex-direction:column;gap:8px}
-.video img{width:100%;height:420px;object-fit:contain;background:#0a0e13;border:1px solid #202636;border-radius:12px}
-.videoBar{display:flex;gap:8px}
-.videoBar input{flex:1;background:#0e131a;color:var(--text);border:1px solid #20242b;border-radius:6px;padding:6px 8px}
+
+/* Контейнер стрима с фиксированным соотношением 4:3 (800x600) */
+.streamContainer{
+  position:relative;
+  width:100%;
+  aspect-ratio:4/3;
+  background:#0a0e13;
+  border:1px solid #202636;
+  border-radius:12px;
+  overflow:hidden;
+}
+.streamContainer img{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  display:block;
+}
+.streamOverlay{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:var(--sub);
+  font-size:18px;
+  background:#0a0e13;
+  pointer-events:none;
+}
+
+.videoBar{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.videoBar input{background:#0e131a;color:var(--text);border:1px solid #20242b;border-radius:6px;padding:6px 8px;width:150px}
 .videoBar button{padding:8px 10px;border:1px solid #2b313a;background:#111620;color:var(--text);border-radius:8px;cursor:pointer}
 
 .status .kv{
