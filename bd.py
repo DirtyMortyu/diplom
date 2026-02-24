@@ -91,6 +91,8 @@ def login():
                     return jsonify({"success": True, "role": user["role_name"], "login": user["login"]})
                 return jsonify({"success": False, "message": "Неверный логин или пароль"}), 401
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return jsonify({"success": False, "error": str(e)}), 500
         finally:
             if connection: connection.close()
