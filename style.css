@@ -97,9 +97,37 @@ h3{margin:10px 0 8px 0;color:var(--sub);font-weight:600}
 .joyHelp{font-size:12px;color:var(--sub);margin-top:6px}
 
 .video .videoWrap{display:flex;flex-direction:column;gap:8px}
-.video img{width:100%;height:420px;object-fit:contain;background:#0a0e13;border:1px solid #202636;border-radius:12px}
-.videoBar{display:flex;gap:8px}
-.videoBar input{flex:1;background:#0e131a;color:var(--text);border:1px solid #20242b;border-radius:6px;padding:6px 8px}
+
+/* Контейнер стрима с фиксированным соотношением 4:3 (800x600) */
+.streamContainer{
+  position:relative;
+  width:100%;
+  aspect-ratio:4/3;
+  background:#0a0e13;
+  border:1px solid #202636;
+  border-radius:12px;
+  overflow:hidden;
+}
+.streamContainer img{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  display:block;
+}
+.streamOverlay{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:var(--sub);
+  font-size:18px;
+  background:#0a0e13;
+  pointer-events:none;
+}
+
+.videoBar{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.videoBar input{background:#0e131a;color:var(--text);border:1px solid #20242b;border-radius:6px;padding:6px 8px;width:150px}
 .videoBar button{padding:8px 10px;border:1px solid #2b313a;background:#111620;color:var(--text);border-radius:8px;cursor:pointer}
 
 .status .kv{
@@ -201,4 +229,117 @@ h3{margin:10px 0 8px 0;color:var(--sub);font-weight:600}
   word-break: break-word;
   overflow-wrap: anywhere;
   
+}
+/* Таблица истории */
+.table-container {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 10px;
+}
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    color: #ccc;
+}
+.admin-table th { text-align: left; border-bottom: 1px solid #444; padding: 5px; }
+.admin-table td { border-bottom: 1px solid #333; padding: 5px; }
+
+/* Список пользователей */
+.user-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #1b2330;
+    padding: 8px;
+    margin-bottom: 5px;
+    border-radius: 4px;
+    border: 1px solid #2a3140;
+}
+.user-actions button {
+    margin-left: 5px;
+    cursor: pointer;
+    font-size: 12px;
+}
+.btn-delete { color: #ff4d4d; background: none; border: none; }
+.btn-edit { color: #3ea6ff; background: none; border: none; }
+.btn-add { background: #28a745; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px;}
+
+/* Модалка */
+.input-field {
+    width: 100%;
+    padding: 8px;
+    margin: 5px 0;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    color: white;
+}
+
+/* Кнопка выхода */
+.btn-logout {
+    padding: 8px 12px;
+    background: #ff4d4d;
+    color: white;
+    border: 1px solid #c93939;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+.btn-logout:hover {
+    background: #e63939;
+}
+
+/* Модалка пользователя */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 10000;
+    justify-content: center;
+    align-items: center;
+}
+.modal-content {
+    background: var(--card);
+    padding: 30px;
+    border-radius: 14px;
+    border: 1px solid #232836;
+    min-width: 400px;
+}
+.modal-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+.btn-confirm {
+    flex: 1;
+    padding: 10px;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+}
+.btn-cancel {
+    flex: 1;
+    padding: 10px;
+    background: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+.btn-small {
+    padding: 6px 12px;
+    background: #111620;
+    color: var(--text);
+    border: 1px solid #2b313a;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
 }

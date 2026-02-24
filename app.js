@@ -1,337 +1,543 @@
-// ======= HELPERS =======
+// ======= ИНИЦИАЛИЗАЦИЯ И ХЕЛПЕРЫ =======
 const $ = sel => document.querySelector(sel);
 const logBox = $("#log");
 
+// ======= УЛЬТИМАТИВНЫЙ КОННЕКТ MQTT =======
+const client = mqtt.connect('wss://rover-pgk.duckdns.org:9001/mqtt', {
+    clientId: 'web_' + Math.random().toString(16).substr(2, 8),
+    username: 'rover',       // если у тебя пароль нужен
+    password: 'rover123',    // если у тебя пароль нужен
+    reconnectPeriod: 1000    // авто-переподключение каждые 1с
+});
+
+client.on('connect', () => {
+    console.log('✅ MQTT подключён по WSS!');
+    log('MQTT подключён!', 'net');
+    // Подписываемся на топик для диагностики
+    client.subscribe('dirtymortyu/rover/cmd', (err) => {
+        if (!err) {
+            console.log('✅ Подписка на топик успешна');
+            log('Подписка на топик OK', 'net');
+        }
+    });
+});
+
+client.on('message', (topic, message) => {
+    console.log('📩 Получено из MQTT:', topic, message.toString());
+    log(`Echo: ${message.toString()}`, 'net');
+});
+
+client.on('error', (err) => {
+    console.error('❌ Ошибка MQTT:', err);
+    log('Ошибка MQTT: ' + err.message, 'net');
+});
+
+client.on('offline', () => {
+    console.warn('⚠️ MQTT отключён');
+    log('MQTT отключён', 'net');
+});
+
+client.on('reconnect', () => {
+    console.log('🔄 MQTT переподключение...');
+});
+
+
 function log(msg, cat = "misc") {
-  const ts = new Date().toLocaleTimeString();
-  if (cat === "motor" && !$("#logMotor").checked) return;
-  if (cat === "net" && !$("#logNet").checked) return;
-  if (cat === "telem" && !$("#logTelem").checked) return;
-  const line = document.createElement("div");
-  line.textContent = `[${ts}] ${msg}`;
-  logBox.prepend(line);
+    const ts = new Date().toLocaleTimeString();
+    if (cat === "motor" && !$("#logMotor")?.checked) return;
+    if (cat === "net" && !$("#logNet")?.checked) return;
+    const line = document.createElement("div");
+    line.textContent = `[${ts}] ${msg}`;
+    if (logBox) logBox.prepend(line);
 }
 
-$("#clearLog").onclick = () => logBox.innerHTML = "";
+if ($("#clearLog")) $("#clearLog").onclick = () => logBox.innerHTML = "";
 
+// ======= ПЕРЕМЕННЫЕ СОСТОЯНИЯ =======
 let currentUser = null;
+let apiBase = $("#apiBase")?.value.trim() || ""; // Используем apiBase как в твоем коде
+let demo = false;
+let currentCmd = "STOP";
 
-function showLoginModal() {
-  $("#loginModal").style.display = "flex";
-  $("#loginInput").value = "";
-  $("#passwordInput").value = "";
-  $("#loginInput").focus();
-}
+const cmdMap = {
+    forward: "FORWARD",
+    backward: "BACKWARD",
+    left: "LEFT",
+    right: "RIGHT",
+    stop: "STOP",
+    TURN360: "TURN360"
+};
 
-function hideLoginModal() {
-  $("#loginModal").style.display = "none";
-}
-
-async function login() {
-    const loginInput = document.getElementById("loginInput").value.trim();
-    const password = document.getElementById("passwordInput").value;
-
-    if (!loginInput || !password) {
-        alert("Введите логин и пароль!");
+// ======= ГЛАВНАЯ ФУНКЦИЯ ОТПРАВКИ КОМАНД =======
+async function sendESPCommand(cmd) {
+    if (!currentUser) return;
+    const espCmd = cmdMap[cmd] || "STOP";
+    
+    if (demo) {
+        log(`[DEMO] Команда: ${espCmd}`, "motor");
         return;
     }
- try {
-    const response = await fetch(`${apiBase}/api/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ login: loginInput, password })
-    });
 
-    const data = await response.json(); // Сначала читаем ответ
-
-    if (!response.ok) {
-        // Если сервер вернул 500 или 401, показываем текст ошибки с сервера
-        throw new Error(data.error || data.message || `Ошибка сети: ${response.status}`);
+    if (!client.connected) {
+        log("Ошибка: Нет связи с MQTT!", "net");
+        return;
     }
 
-    if (data.success) {
-        currentUser = { login: data.login, role: data.role };
-        localStorage.setItem("user", JSON.stringify(currentUser));
-        loadUserPanel();
-        hideLoginModal();
-        log(`Вход выполнен как ${data.role}`, "misc");
-    } else {
-        // Логическая ошибка (например, неверный пароль, если статус был 200)
-        alert(data.message || "Неверный логин или пароль!");
-    }
-} catch (err) {
-    console.error(err);
-    // Теперь alert покажет реальную ошибку: "Ошибка подключения к БД: ..."
-    alert(err.message); 
-}
+    const topic = 'dirtymortyu/rover/cmd';
+    client.publish(topic, espCmd, { qos: 0 });
+    log(`Облако -> ${espCmd}`, "motor");
 }
 
+const stopESP = () => sendESPCommand("stop");
+
+// ======= АВТОРИЗАЦИЯ =======
+function showLoginModal() { $("#loginModal").style.display = "flex"; }
+function hideLoginModal() { $("#loginModal").style.display = "none"; }
+
+async function login() {
+    const loginInput = $("#loginInput").value.trim();
+    const password = $("#passwordInput").value;
+    apiBase = $("#apiBase").value.trim();
+
+    if (!loginInput || !password) return alert("Введите данные!");
+
+    try {
+        const response = await fetch(`${apiBase}/api/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ login: loginInput, password })
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            currentUser = { login: data.login, role: data.role };
+            localStorage.setItem("user", JSON.stringify(currentUser));
+            loadUserPanel();
+            hideLoginModal();
+            log(`Вход: ${data.role}`, "misc");
+        } else {
+            alert(data.message);
+        }
+    } catch (err) {
+        log("Ошибка сервера авторизации", "net");
+    }
+}
 
 function logout() {
-  currentUser = null;
-  localStorage.removeItem("user");
-  showLoginModal();
-  log("Выход из системы", "misc");
+    currentUser = null;
+    localStorage.removeItem("user");
+    location.reload();
 }
+
+// ======= АДМИНКА: ИСТОРИЯ ВХОДОВ =======
+async function loadLoginHistory() {
+    const tbody = $("#loginHistoryBody");
+    if (!tbody) return;
+
+    try {
+        const response = await fetch(`${apiBase}/api/logs`);
+        const logs = await response.json();
+
+        tbody.innerHTML = "";
+        logs.forEach(logItem => {
+            const dateStr = logItem.created_at ? new Date(logItem.created_at).toLocaleString() : "---";
+            const row = `
+                <tr>
+                    <td>${dateStr}</td>
+                    <td>${logItem.ip || "Unknown"}</td>
+                    <td>${logItem.login}</td>
+                    <td style="color:${logItem.success ? '#4caf50' : '#f44336'}">
+                        ${logItem.success ? 'Успех' : 'Ошибка'}
+                    </td>
+                </tr>
+            `;
+            tbody.innerHTML += row;
+        });
+
+        // Обновляем время последнего обновления
+        const updateTime = document.querySelector("#lastUpdateTime");
+        if (updateTime) {
+            updateTime.textContent = new Date().toLocaleTimeString();
+        }
+    } catch (e) {
+        tbody.innerHTML = "<tr><td colspan='4'>Ошибка загрузки логов</td></tr>";
+    }
+}
+
+// ======= АДМИНКА: ПОЛЬЗОВАТЕЛИ =======
+async function loadUsers() {
+    const list = $("#usersList");
+    if (!list) return;
+    list.innerHTML = "Загрузка...";
+    
+    try {
+        const res = await fetch(`${apiBase}/api/users`);
+        const users = await res.json();
+        
+        list.innerHTML = "";
+        users.forEach(u => {
+            const div = document.createElement("div");
+            div.className = "user-item";
+            // ВАЖНО: u.id берем из бэкенда (убедись что бэкенд шлет id)
+            div.innerHTML = `
+                <span>
+                    <strong>${u.login}</strong> 
+                    <small style="color:#888">(${u.role})</small>
+                </span>
+                <div class="user-actions">
+                    <button class="btn-edit" onclick="editUser('${u.id}', '${u.login}', '${u.role}')">✏️</button>
+                    <button class="btn-delete" onclick="deleteUser('${u.id}')">🗑️</button>
+                </div>
+            `;
+            list.appendChild(div);
+        });
+    } catch (e) {
+        list.innerHTML = "Ошибка загрузки пользователей";
+    }
+}
+
+// ======= МОДАЛЬНОЕ ОКНО ПОЛЬЗОВАТЕЛЯ =======
+function showUserModal() {
+    $("#userModal").style.display = "flex";
+    $("#userModalTitle").innerText = "Новый пользователь";
+    $("#editUserId").value = "";
+    $("#newLogin").value = "";
+    $("#newPass").value = "";
+    $("#newRole").value = "user";
+}
+
+function editUser(id, login, role) {
+    $("#userModal").style.display = "flex";
+    $("#userModalTitle").innerText = "Редактирование";
+    $("#editUserId").value = id;
+    $("#newLogin").value = login;
+    $("#newRole").value = role;
+    $("#newPass").value = ""; // Пароль пустой, если не меняем
+}
+
+function closeUserModal() { $("#userModal").style.display = "none"; }
+
+// ======= ФИНАЛЬНАЯ ФУНКЦИЯ СОХРАНЕНИЯ (БЕЗ ОШИБОК) =======
+async function saveUser() {
+    const userId = $("#editUserId").value;
+    const username = $("#newLogin").value;
+    const password = $("#newPass").value;
+    const role = $("#newRole").value;
+
+    if (!username) return alert("Введите логин!");
+
+    const url = userId ? `${apiBase}/api/users/${userId}` : `${apiBase}/api/users`;
+    const method = userId ? 'PUT' : 'POST';
+
+    const userData = { login: username, password: password, role: role };
+
+    try {
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(userData)
+        });
+
+        if (response.ok) {
+            alert(userId ? "Данные обновлены!" : "Пользователь добавлен!");
+            closeUserModal();
+            loadUsers();
+        } else {
+            const errData = await response.json();
+            alert("Ошибка: " + (errData.message || "Сервер отклонил запрос"));
+        }
+    } catch (error) {
+        console.error("Ошибка сохранения:", error);
+        alert("Не удалось связаться с сервером");
+    }
+}
+
+async function deleteUser(id) {
+    if(!confirm("Удалить пользователя?")) return;
+    try {
+        await fetch(`${apiBase}/api/users/${id}`, { method: 'DELETE' });
+        loadUsers();
+    } catch (e) { console.error(e); }
+}
+
+// Глобальная переменная для таймера
+let historyUpdateTimer = null;
 
 function loadUserPanel() {
-  const mainContent = $(".grid");
-  const topbar = $(".topbar");
-  
-  // Скрываем/показываем элементы в зависимости от роли
-  if (currentUser?.role === "user") {
-    // ПОЛЬЗОВАТЕЛЬ - только управление и видео
-    $(".brand strong").textContent = "RoboPanel - Пользователь";
-    
-    // Показываем только нужные карточки
-    $(".controls").style.display = "block";
-    $(".video").style.display = "block";
-    
-    // Скрываем остальные
-    $(".status").style.display = "none";
-    $(".tasks").style.display = "none";
-    $(".logs").style.display = "none";
-    
-    // Настраиваем grid
-    mainContent.style.gridTemplateColumns = "1fr 1fr";
-    mainContent.style.gridTemplateRows = "auto";
-    
-    // Добавляем кнопку выхода
-    if (!$("#logoutBtn")) {
-      const logoutBtn = document.createElement("button");
-      logoutBtn.id = "logoutBtn";
-      logoutBtn.textContent = "Выйти";
-      logoutBtn.style.marginLeft = "10px";
-      logoutBtn.onclick = logout;
-      topbar.querySelector(".conn").appendChild(logoutBtn);
+    if (currentUser?.role === "admin") {
+        $(".brand strong").textContent = "Admin Panel";
+        $("#historyCard").style.display = "block";
+        $("#userManageCard").style.display = "block";
+        loadLoginHistory();
+        loadUsers();
+
+        // Автообновление истории входов каждые 10 секунд
+        if (historyUpdateTimer) clearInterval(historyUpdateTimer);
+        historyUpdateTimer = setInterval(() => {
+            if (currentUser?.role === "admin") {
+                loadLoginHistory();
+            } else {
+                clearInterval(historyUpdateTimer);
+            }
+        }, 10000); // 10 секунд
+
+        log("Автообновление истории: ВКЛ (каждые 10 сек)", "misc");
+    } else {
+        $(".brand strong").textContent = "RoboPanel";
+        if ($("#historyCard")) $("#historyCard").style.display = "none";
+        if ($("#userManageCard")) $("#userManageCard").style.display = "none";
+
+        // Останавливаем таймер для обычных пользователей
+        if (historyUpdateTimer) {
+            clearInterval(historyUpdateTimer);
+            historyUpdateTimer = null;
+        }
     }
-    
-  } else if (currentUser?.role === "admin") {
-    // АДМИНИСТРАТОР - всё
-    $(".brand strong").textContent = "RoboPanel - Администратор";
-    
-    // Показываем все карточки
-    $(".controls").style.display = "block";
-    $(".video").style.display = "block";
-    $(".status").style.display = "block";
-    $(".tasks").style.display = "block";
-    $(".logs").style.display = "block";
-    
-    // Восстанавливаем оригинальный grid
-    mainContent.style.gridTemplateColumns = "380px 1fr 420px";
-    mainContent.style.gridTemplateRows = "auto auto";
-    
-    // Добавляем кнопку выхода
+
     if (!$("#logoutBtn")) {
-      const logoutBtn = document.createElement("button");
-      logoutBtn.id = "logoutBtn";
-      logoutBtn.textContent = "Выйти";
-      logoutBtn.style.marginLeft = "10px";
-      logoutBtn.onclick = logout;
-      topbar.querySelector(".conn").appendChild(logoutBtn);
+        const btn = document.createElement("button");
+        btn.id = "logoutBtn";
+        btn.className = "btn-logout";
+        btn.textContent = "Выйти";
+        btn.onclick = logout;
+        $(".topbar .conn").appendChild(btn);
     }
-  }
 }
 
-// ====== GLOBALS ======
-apiBase = $("#apiBase")?.value.trim() || "http://192.168.31.96";
-let demo = false;
-
-$("#connectBtn").onclick = () => { 
-    apiBase = $("#apiBase").value.trim() || "http://192.168.31.96";
-    log(`Используем IP: ${apiBase}`, "net");
-    sendESPCommand("stop"); // стартовая команда
-};
-
-// ====== COMMAND MAPPING ======
-const cmdMap = {
-  forward: "FORWARD",
-  backward: "BACKWARD",
-  left: "LEFT",
-  right: "RIGHT",
-  stop: "STOP",
-  TURN360: "TURN360"
-};
-
-// ====== SEND COMMAND ======
-async function sendESPCommand(cmd) {
-  const espCmd = cmdMap[cmd] || "STOP";
-
-  // Лог команды всегда
-  log(`Команда отправлена: ${espCmd}`, "motor");
-
-  if (demo) return;
-
-  try {
-    await fetch(`${apiBase}/api/move`, {
-      method: "POST",
-      headers: {"Content-Type": "application/x-www-form-urlencoded"},
-      body: `cmd=${encodeURIComponent(espCmd)}`,
-    });
-  } catch(e) {
-    // Ошибки сети отдельно, не мешают логам команд
-    log(`Сетевая ошибка: ${e.message}`, "net");
-  }
-}
-
-async function stopESP() { await sendESPCommand("stop"); }
-
-// ====== BUTTON CONTROL ======
-document.querySelectorAll(".btn").forEach(b => {
-  b.addEventListener("mousedown", () => sendESPCommand(b.dataset.cmd));
-  b.addEventListener("touchstart", e => { e.preventDefault(); sendESPCommand(b.dataset.cmd); }, {passive:false});
-});
-document.querySelectorAll(".dir").forEach(b => {
-  b.addEventListener("mouseup", stopESP);
-  b.addEventListener("mouseleave", e => { if(e.buttons===1) stopESP(); });
-  b.addEventListener("touchend", stopESP);
+// ======= УПРАВЛЕНИЕ КНОПКАМИ =======
+document.querySelectorAll(".btn[data-cmd]").forEach(b => {
+    b.addEventListener("mousedown", () => sendESPCommand(b.dataset.cmd));
+    b.addEventListener("mouseup", stopESP);
+    b.addEventListener("mouseleave", stopESP); // Останавливаем если увели курсор
 });
 
-// ====== TURN360 BUTTON ======
-document.addEventListener("DOMContentLoaded", () => {
-    const turnBtn = document.getElementById("square");
-    if(turnBtn) {
-        turnBtn.addEventListener("click", () => {
-            sendESPCommand("TURN360");
-            log("Команда отправлена: TURN360", "motor");
-        });
-    }
-});
 
-// ====== KEYBOARD CONTROL ======
-let keysPressed = new Set();
-let currentCmd = "stop"; // текущая команда
-let kbEnabled = false; // глобально: включена ли клавиатура
 
-// кнопка переключения клавиатуры
+let kbEnabled = false;
+
 $("#kbBtn").onclick = () => {
     kbEnabled = !kbEnabled;
-    $("#kbBtn").innerText = kbEnabled ? "Выключить управление клавой" : "Включить управление клавой";
-    $("#kbStatus").innerText = "Режим: " + (kbEnabled ? "включён" : "выключен");
+    $("#kbBtn").textContent = kbEnabled ? "Клава: ВКЛ" : "Клава: ВЫКЛ";
+    $("#kbStatus").textContent = kbEnabled ? "Режим: включен ✅" : "Режим: выключен";
+    log(kbEnabled ? "Клавиатура ВКЛ" : "Клавиатура ВЫКЛ", "misc");
 };
 
-// маппинг клавиш
-const keyMap = { 
-  "w": "forward", "ArrowUp": "forward", "W": "forward",
-  "s": "backward", "ArrowDown": "backward", "S": "backward",
-  "a": "left", "ArrowLeft": "left", "A": "left",
-  "d": "right", "ArrowRight": "right", "D": "right",
-  " ": "stop",
-  "k": "TURN360",
+
+
+const keyMap = {
+
+    "w": "forward", "ArrowUp": "forward",
+
+    "s": "backward", "ArrowDown": "backward",
+
+    "a": "left", "ArrowLeft": "left",
+
+    "d": "right", "ArrowRight": "right",
+
+    " ": "stop"
+
 };
 
-// обработчик нажатия
+
+
 document.addEventListener("keydown", e => {
-  if (!kbEnabled) return;
-  const cmd = keyMap[e.key];
-  if (!cmd) return;
 
-  if (!keysPressed.has(e.key)) keysPressed.add(e.key);
+    if (kbEnabled && keyMap[e.key] && currentCmd !== keyMap[e.key]) {
 
-  const newCmd = Array.from(keysPressed).map(k => keyMap[k])[0] || "stop";
-  if (newCmd !== currentCmd) {
-    currentCmd = newCmd;
-    sendESPCommand(currentCmd);
-  }
+        currentCmd = keyMap[e.key];
+
+        sendESPCommand(currentCmd);
+
+    }
+
 });
 
-// обработчик отпускания
+
+
 document.addEventListener("keyup", e => {
-  if (!kbEnabled) return;
-  if (keysPressed.has(e.key)) keysPressed.delete(e.key);
 
-  const newCmd = Array.from(keysPressed).map(k => keyMap[k])[0] || "stop";
-  if (newCmd !== currentCmd) {
-    currentCmd = newCmd;
-    sendESPCommand(currentCmd);
-  }
+    if (kbEnabled && keyMap[e.key]) {
+
+        currentCmd = "STOP";
+
+        stopESP();
+
+    }
+
 });
 
-// ====== JOYSTICK ======
-const joy = $("#joystick");
-const jctx = joy.getContext("2d");
+
+
+// ======= ДЖОЙСТИК =======
+
+const joy = $("#joystick"), jctx = joy.getContext("2d");
+
 const center = {x: joy.width/2, y: joy.height/2};
-const R = 90, knobR = 26;
+
 let dragging = false, knob = {...center};
 
+
+
 function drawJoy() {
-  jctx.clearRect(0,0,joy.width,joy.height);
-  jctx.beginPath(); jctx.arc(center.x, center.y, R, 0, Math.PI*2);
-  jctx.strokeStyle = "#2a3140"; jctx.lineWidth = 3; jctx.stroke();
 
-  jctx.beginPath();
-  jctx.moveTo(center.x-R, center.y); jctx.lineTo(center.x+R, center.y);
-  jctx.moveTo(center.x, center.y-R); jctx.lineTo(center.x, center.y+R);
-  jctx.strokeStyle = "#243042"; jctx.lineWidth = 1; jctx.stroke();
+    jctx.clearRect(0,0,joy.width,joy.height);
 
-  jctx.beginPath();
-  jctx.arc(knob.x, knob.y, knobR, 0, Math.PI*2);
-  jctx.fillStyle = "#1b2330";
-  jctx.fill();
-  jctx.strokeStyle = "#3ea6ff";
-  jctx.lineWidth = 2;
-  jctx.stroke();
-}
+    jctx.beginPath(); jctx.arc(center.x, center.y, 80, 0, Math.PI*2);
 
-function joyCmdFromVec(dx, dy){
- const absDx = Math.abs(dx);
-const absDy = Math.abs(dy);
-if(absDx > absDy) return dx > 0 ? "right" : "left";
-else return dy > 0 ? "forward" : "backward";
+    jctx.strokeStyle = "#2a3140"; jctx.stroke();
+
+    jctx.beginPath(); jctx.arc(knob.x, knob.y, 25, 0, Math.PI*2);
+
+    jctx.fillStyle = "#3ea6ff"; jctx.fill();
 
 }
 
-function setKnob(pos){
-  const dx = pos.x - center.x, dy = pos.y - center.y;
-  const mag = Math.hypot(dx, dy);
-  if(mag>R){ const k=R/mag; knob.x=center.x+dx*k; knob.y=center.y+dy*k; }
-  else knob={...pos};
-  drawJoy();
-  const cmd = joyCmdFromVec(dx, dy);
-  if(cmd==="stop") stopESP(); else sendESPCommand(cmd);
+
+
+function handleJoy(e) {
+
+    if (!dragging) return;
+
+    const rect = joy.getBoundingClientRect();
+
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+
+    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+
+    const dx = x - center.x, dy = y - center.y;
+
+    const mag = Math.hypot(dx, dy);
+
+   
+
+    knob = mag > 80 ? {x: center.x + dx*80/mag, y: center.y + dy*80/mag} : {x, y};
+
+    drawJoy();
+
+
+
+    let newCmd = "stop";
+
+    if (mag > 30) {
+
+        if (Math.abs(dx) > Math.abs(dy)) newCmd = dx > 0 ? "right" : "left";
+
+        else newCmd = dy < 0 ? "forward" : "backward";
+
+    }
+
+    if (newCmd !== currentCmd) {
+
+        currentCmd = newCmd;
+
+        sendESPCommand(currentCmd);
+
+    }
+
 }
 
-function joyRelease(){ dragging=false; knob={...center}; drawJoy(); stopESP(); }
-function joyPosFromEvent(e){
-  const rect = joy.getBoundingClientRect();
-  const x = (e.touches ? e.touches[0].clientX : e.clientX)-rect.left;
-  const y = (e.touches ? e.touches[0].clientY : e.clientY)-rect.top;
-  return {x, y};
-}
 
-joy.addEventListener("mousedown", e => { dragging=true; setKnob(joyPosFromEvent(e)); });
-joy.addEventListener("mousemove", e => { if(dragging) setKnob(joyPosFromEvent(e)); });
-document.addEventListener("mouseup", joyRelease);
-joy.addEventListener("touchstart", e => { e.preventDefault(); dragging=true; setKnob(joyPosFromEvent(e)); }, {passive:false});
-joy.addEventListener("touchmove", e => { e.preventDefault(); if(dragging) setKnob(joyPosFromEvent(e)); }, {passive:false});
-joy.addEventListener("touchend", e => { e.preventDefault(); joyRelease(); }, {passive:false});
 
-// ====== DEMO MODE ======
-$("#demoToggle").onchange = () => { demo=$("#demoToggle").checked; log(`Demo: ${demo}`, "net"); };
-
-// ====== INIT ======
-window.addEventListener("load", () => {
-  apiBase = $("#apiBase").value.trim(); 
-  drawJoy();
-  
-  // Инициализация системы входа
-  $("#loginSubmitBtn").onclick = login;
-  
-  // Ввод по Enter в полях ввода
-  $("#loginInput").addEventListener("keypress", (e) => {
-    if (e.key === "Enter") login();
-  });
-  
-  $("#passwordInput").addEventListener("keypress", (e) => {
-    if (e.key === "Enter") login();
-  });
-  
-  // Проверяем сохранённую сессию
-  const savedUser = localStorage.getItem("user");
-  if (savedUser) {
-    currentUser = JSON.parse(savedUser);
-    loadUserPanel();
-  } else {
-    showLoginModal();
-  }
+// Поддержка мыши
+joy.addEventListener("mousedown", () => dragging = true);
+document.addEventListener("mousemove", handleJoy);
+document.addEventListener("mouseup", () => {
+    dragging = false;
+    knob = {...center};
+    drawJoy();
+    stopESP();
+    currentCmd="STOP";
 });
+
+// Поддержка сенсорных экранов
+joy.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    dragging = true;
+    handleJoy(e);
+});
+document.addEventListener("touchmove", (e) => {
+    e.preventDefault();
+    handleJoy(e);
+});
+document.addEventListener("touchend", () => {
+    dragging = false;
+    knob = {...center};
+    drawJoy();
+    stopESP();
+    currentCmd = "STOP";
+});
+
+window.onload = () => {
+    if (typeof drawJoy === "function") drawJoy();
+    if ($("#loginSubmitBtn")) $("#loginSubmitBtn").onclick = login;
+
+    // Обработчик Demo Mode
+    if ($("#demoToggle")) {
+        $("#demoToggle").onchange = (e) => {
+            demo = e.target.checked;
+            log(demo ? "Demo Mode ВКЛ" : "Demo Mode ВЫКЛ", "misc");
+        };
+    }
+
+    // Видео стрим напрямую с ESP32-CAM
+    const cameraIpInput = $("#cameraIp");
+    const streamImg = $("#stream");
+    const streamOverlay = $("#streamOverlay");
+
+    // Загружаем сохранённый IP камеры
+    const savedCamIp = localStorage.getItem("cameraIp");
+    if (savedCamIp && cameraIpInput) cameraIpInput.value = savedCamIp;
+
+    if ($("#streamStart")) {
+        $("#streamStart").onclick = () => {
+            const camIp = cameraIpInput?.value.trim();
+            if (!camIp) {
+                alert("Введите IP адрес ESP32-CAM!");
+                return;
+            }
+
+            localStorage.setItem("cameraIp", camIp);
+            const streamUrl = `http://${camIp}/stream`;
+            streamImg.src = streamUrl;
+            if (streamOverlay) streamOverlay.style.display = "none";
+            log(`Видео: подключение к ${streamUrl}`, "net");
+
+            streamImg.onerror = () => {
+                if (streamOverlay) {
+                    streamOverlay.style.display = "flex";
+                    streamOverlay.textContent = "Нет сигнала";
+                }
+                log("Камера недоступна. Проверьте IP ESP32-CAM", "net");
+            };
+            streamImg.onload = () => {
+                log("Видео подключено!", "net");
+            };
+        };
+    }
+    if ($("#streamStop")) {
+        $("#streamStop").onclick = () => {
+            streamImg.src = "";
+            streamImg.onerror = null;
+            if (streamOverlay) {
+                streamOverlay.style.display = "flex";
+                streamOverlay.textContent = "Нет сигнала";
+            }
+            log("Видео остановлено", "misc");
+        };
+    }
+
+    // Миссии
+    document.querySelectorAll("[data-mission]").forEach(btn => {
+        btn.onclick = () => {
+            const mission = btn.dataset.mission;
+            if (mission === "square") {
+                sendESPCommand("TURN360");
+                log("Миссия: поворот 360°", "motor");
+            }
+        };
+    });
+
+    const saved = localStorage.getItem("user");
+    if (saved) { currentUser = JSON.parse(saved); loadUserPanel(); }
+    else showLoginModal();
+};
