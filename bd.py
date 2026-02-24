@@ -50,49 +50,55 @@ def get_client_ip():
 # 1. ЛОГИН
 @app.route("/api/login", methods=["POST"])
 def login():
-    data = request.json or {}
-    login_input = data.get("login", "").strip()
-    password_input = data.get("password", "")
-
-    # Валидация входных данных
-    if not login_input or not password_input:
-        return jsonify({"success": False, "message": "Логин и пароль обязательны"}), 400
-
-    if len(login_input) > 50:
-        return jsonify({"success": False, "message": "Логин слишком длинный"}), 400
-
-    connection = None
     try:
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            sql = """
-                SELECT u.idUsers, u.login, u.Password, r.name as role_name 
-                FROM Users u
-                JOIN role r ON u.role_id = r.idrole
-                WHERE u.login=%s LIMIT 1
-            """
-            cursor.execute(sql, (login_input,))
-            user = cursor.fetchone()
+        data = request.json or {}
+        login_input = data.get("login", "").strip()
+        password_input = data.get("password", "")
 
-            success = user and user["Password"] == password_input
-            
-            # Запись лога (используем правильное имя user_id и ipadress)
-            sql_log = "INSERT INTO history_login (user_id, ipadress, success, user_agent) VALUES (%s, %s, %s, %s)"
-            cursor.execute(sql_log, (
-                user["idUsers"] if user else None,
-                get_client_ip(),  # Используем функцию для получения реального IP
-                1 if success else 0,
-                request.headers.get("User-Agent")
-            ))
-            connection.commit()
+        # Валидация входных данных
+        if not login_input or not password_input:
+            return jsonify({"success": False, "message": "Логин и пароль обязательны"}), 400
 
-            if success:
-                return jsonify({"success": True, "role": user["role_name"], "login": user["login"]})
-            return jsonify({"success": False, "message": "Неверный логин или пароль"}), 401
+        if len(login_input) > 50:
+            return jsonify({"success": False, "message": "Логин слишком длинный"}), 400
+
+        connection = None
+        try:
+            connection = get_db_connection()
+            with connection.cursor() as cursor:
+                sql = """
+                    SELECT u.idUsers, u.login, u.Password, r.name as role_name 
+                    FROM Users u
+                    JOIN role r ON u.role_id = r.idrole
+                    WHERE u.login=%s LIMIT 1
+                """
+                cursor.execute(sql, (login_input,))
+                user = cursor.fetchone()
+
+                success = user and user["Password"] == password_input
+                
+                # Запись лога (используем правильное имя user_id и ipadress)
+                sql_log = "INSERT INTO history_login (user_id, ipadress, success, user_agent) VALUES (%s, %s, %s, %s)"
+                cursor.execute(sql_log, (
+                    user["idUsers"] if user else None,
+                    get_client_ip(),  # Используем функцию для получения реального IP
+                    1 if success else 0,
+                    request.headers.get("User-Agent")
+                ))
+                connection.commit()
+
+                if success:
+                    return jsonify({"success": True, "role": user["role_name"], "login": user["login"]})
+                return jsonify({"success": False, "message": "Неверный логин или пароль"}), 401
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 500
+        finally:
+            if connection: connection.close()
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-    finally:
-        if connection: connection.close()
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+                
 
 # 2. ИСТОРИЯ ВХОДОВ
 @app.route("/api/logs", methods=["GET"])
