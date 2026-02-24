@@ -10,7 +10,7 @@ CORS(app)
 db_config = {
     "host": os.environ.get("DB_HOST", "91.222.238.6"),
     "user": os.environ.get("DB_USER", "rover_user"),
-    "password": os.environ.get("DB_PASSWORD", "strong_password123"),
+    "password": os.environ.get("DB_PASSWORD", "root123"),
     "database": os.environ.get("DB_NAME", "rover_db"),
     "port": 3306,
     "cursorclass": pymysql.cursors.DictCursor
