@@ -5,6 +5,7 @@ import os
 import paho.mqtt.client as mqtt
 import threading
 import time
+import bcrypt
 
 app = Flask(__name__)
 CORS(app)
@@ -75,7 +76,10 @@ def login():
                 cursor.execute(sql, (login_input,))
                 user = cursor.fetchone()
 
-                success = user and user["Password"] == password_input
+                success = bool(user and bcrypt.checkpw(
+                    password_input.encode("utf-8"),
+                    user["Password"].encode("utf-8")
+                ))
                 
                 # Запись лога (используем правильное имя user_id и ipadress)
                 sql_log = "INSERT INTO history_login (user_id, ipadress, success, user_agent) VALUES (%s, %s, %s, %s)"
@@ -182,19 +186,19 @@ def manage_user(user_id=None):
             role_id = role_row["idrole"]
 
             if request.method == "PUT" and user_id:
-                # ИСПРАВЛЕНО: Изменено idrole на role_id (согласно скриншоту)
                 if password_val:
+                    hashed = bcrypt.hashpw(password_val.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
                     sql = "UPDATE Users SET login=%s, Password=%s, role_id=%s WHERE idUsers=%s"
-                    cursor.execute(sql, (login_val, password_val, role_id, user_id))
+                    cursor.execute(sql, (login_val, hashed, role_id, user_id))
                 else:
                     sql = "UPDATE Users SET login=%s, role_id=%s WHERE idUsers=%s"
                     cursor.execute(sql, (login_val, role_id, user_id))
             else:
                 if not password_val:
                     return jsonify({"success": False, "message": "Нужен пароль"}), 400
-                # ИСПРАВЛЕНО: Изменено idrole на role_id
+                hashed = bcrypt.hashpw(password_val.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
                 sql = "INSERT INTO Users (login, Password, role_id) VALUES (%s, %s, %s)"
-                cursor.execute(sql, (login_val, password_val, role_id))
+                cursor.execute(sql, (login_val, hashed, role_id))
             
             connection.commit()
             return jsonify({"success": True})

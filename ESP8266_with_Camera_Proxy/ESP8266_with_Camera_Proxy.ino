@@ -1,22 +1,12 @@
 /*
  * ESP8266 - Управление ровером (MQTT)
- *
- * Режим сети: AP+STA
- *   - AP  "RoverCam-AP" — хотспот для ESP32-CAM (192.168.4.x)
- *   - STA — подключение к интернет-роутеру через WiFiManager
- *
- * ESP32-CAM подключается к AP и публикует кадры через MQTT напрямую.
- * Этот модуль отвечает только за управление моторами.
+ * WiFi настраивается через WiFiManager (портал "Rover-Setup")
  */
 
 #include <ESP8266WiFi.h>
 #include <WiFiManager.h>
 #include <PubSubClient.h>
 #include <ESP8266WebServer.h>
-
-// ========== AP для ESP32-CAM ==========
-const char* cam_ap_ssid = "RoverCam-AP";
-const char* cam_ap_pass = "rover12345";
 
 // ========== MQTT настройки ==========
 const char* mqtt_server = "rover-pgk.duckdns.org";
@@ -87,9 +77,8 @@ void handleRoot() {
 <h1>🤖 ESP8266 Rover</h1>
 <div class="info">
   <h3>📡 WiFi</h3>
-  <p><strong>STA IP:</strong> )rawliteral" + WiFi.localIP().toString() + R"rawliteral(</p>
-  <p><strong>AP SSID:</strong> )rawliteral" + String(cam_ap_ssid) + R"rawliteral(</p>
-  <p><strong>AP IP:</strong> )rawliteral" + WiFi.softAPIP().toString() + R"rawliteral(</p>
+  <p><strong>IP:</strong> )rawliteral" + WiFi.localIP().toString() + R"rawliteral(</p>
+  <p><strong>SSID:</strong> )rawliteral" + WiFi.SSID() + R"rawliteral(</p>
 </div>
 <div class="info">
   <h3>🎮 MQTT</h3>
@@ -113,26 +102,19 @@ void setup() {
   Serial1.begin(9600);
 
   Serial.println("\n\n========================================");
-  Serial.println("  ESP8266 Rover v5.0 (AP+STA)");
+  Serial.println("  ESP8266 Rover v6.0 (STA)");
   Serial.println("========================================\n");
 
-  // Поднимаем точку доступа для ESP32-CAM
-  WiFi.mode(WIFI_AP_STA);
-  WiFi.softAP(cam_ap_ssid, cam_ap_pass);
-  Serial.printf("✅ AP: SSID=%s  IP=%s\n",
-                cam_ap_ssid, WiFi.softAPIP().toString().c_str());
-
-  // Подключение к интернет-роутеру
   WiFiManager wm;
   wm.setConfigPortalTimeout(180);
 
-  Serial.println("📡 STA: подключение к WiFi...");
+  Serial.println("📡 Подключение к WiFi...");
   if (!wm.autoConnect("Rover-Setup")) {
-    Serial.println("❌ STA failed. Restarting...");
+    Serial.println("❌ WiFi failed. Restarting...");
     ESP.restart();
   }
 
-  Serial.printf("✅ STA IP: %s\n", WiFi.localIP().toString().c_str());
+  Serial.printf("✅ IP: %s\n", WiFi.localIP().toString().c_str());
 
   // MQTT
   client.setServer(mqtt_server, mqtt_port);

@@ -1,7 +1,7 @@
 /*
  * ESP32-CAM — публикация кадров через MQTT (сырой JPEG, без Base64)
  *
- * Подключается к хотспоту ESP8266 (RoverCam-AP),
+ * Подключается к домашнему роутеру через WiFiManager,
  * захватывает JPEG-кадры и публикует в MQTT топик
  * dirtymortyu/rover/camera как бинарные данные.
  * Flask-бэкенд (bd.py) раздаёт их как MJPEG по HTTPS.
@@ -9,6 +9,7 @@
 
 #include "esp_camera.h"
 #include <WiFi.h>
+#include <WiFiManager.h>
 #include <PubSubClient.h>
 
 // ========== Пины камеры AI-Thinker ==========
@@ -28,10 +29,6 @@
 #define VSYNC_GPIO_NUM    25
 #define HREF_GPIO_NUM     23
 #define PCLK_GPIO_NUM     22
-
-// ========== WiFi — AP от ESP8266 ==========
-const char* ap_ssid     = "RoverCam-AP";
-const char* ap_password = "rover12345";
 
 // ========== MQTT ==========
 const char* mqtt_server = "rover-pgk.duckdns.org";
@@ -150,7 +147,7 @@ void setup() {
   Serial.begin(115200);
   Serial.println();
   Serial.println("========================================");
-  Serial.println("   ESP32-CAM v6.0 (MQTT Stream)");
+  Serial.println("   ESP32-CAM v7.0 (MQTT Stream)");
   Serial.println("========================================");
 
   if (!initCamera()) {
@@ -158,21 +155,21 @@ void setup() {
     return;
   }
 
-  // Подключение к ESP8266 AP
-  WiFi.mode(WIFI_STA);
+  // WiFiManager — подключение к домашнему роутеру
+  // При первом запуске поднимает AP "ESP32-CAM-Setup" для настройки
+  WiFiManager wm;
+  wm.setConfigPortalTimeout(180);
   WiFi.setSleep(false);
-  WiFi.begin(ap_ssid, ap_password);
 
-  Serial.printf("📡 Connecting to AP: %s\n", ap_ssid);
-  unsigned long t = millis();
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500); Serial.print(".");
-    if (millis() - t > 30000) {
-      Serial.println("\n❌ WiFi timeout! Restarting...");
-      ESP.restart();
-    }
+  Serial.println("📡 Подключение к WiFi...");
+  Serial.println("Если сеть не найдена — подключитесь к 'ESP32-CAM-Setup'");
+
+  if (!wm.autoConnect("ESP32-CAM-Setup")) {
+    Serial.println("❌ Не удалось подключиться. Перезагрузка...");
+    ESP.restart();
   }
-  Serial.printf("\n✅ Connected! IP: %s\n", WiFi.localIP().toString().c_str());
+
+  Serial.printf("✅ WiFi connected! IP: %s\n", WiFi.localIP().toString().c_str());
 
   // MQTT
   mqttClient.setServer(mqtt_server, mqtt_port);
@@ -188,10 +185,9 @@ void setup() {
 // ========== LOOP ==========
 void loop() {
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("⚠️ WiFi lost, reconnecting...");
-    WiFi.reconnect();
-    delay(5000);
-    return;
+    Serial.println("⚠️ WiFi lost, restarting...");
+    delay(3000);
+    ESP.restart();
   }
 
   if (!mqttClient.connected()) reconnectMQTT();
