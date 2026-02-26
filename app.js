@@ -497,7 +497,8 @@ window.onload = () => {
             }
 
             localStorage.setItem("cameraIp", camIp);
-            const streamUrl = `http://${camIp}/stream`;
+            // Стрим идёт через прокси ESP8266, а не напрямую с ESP32-CAM
+            const streamUrl = `http://${camIp}/camera/stream`;
             streamImg.src = streamUrl;
             if (streamOverlay) streamOverlay.style.display = "none";
             log(`Видео: подключение к ${streamUrl}`, "net");
