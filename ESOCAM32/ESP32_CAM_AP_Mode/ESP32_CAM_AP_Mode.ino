@@ -1,9 +1,16 @@
+/*
+ * ESP32-CAM — публикация кадров через MQTT
+ *
+ * Подключается к хотспоту ESP8266 (RoverCam-AP),
+ * захватывает JPEG-кадры и публикует в MQTT топик
+ * dirtymortyu/rover/camera (Base64).
+ * Flask-бэкенд (bd.py) раздаёт их как MJPEG по HTTPS.
+ */
 
 #include "esp_camera.h"
 #include <WiFi.h>
-#include <WiFiManager.h>
-#include <ESPmDNS.h>
-#include "esp_http_server.h"
+#include <PubSubClient.h>
+#include "mbedtls/base64.h"
 
 // ========== Пины камеры AI-Thinker ==========
 #define PWDN_GPIO_NUM     32
@@ -23,337 +30,191 @@
 #define HREF_GPIO_NUM     23
 #define PCLK_GPIO_NUM     22
 
-// ========== Глобальные переменные ==========
-httpd_handle_t camera_httpd = NULL;
+// ========== WiFi — AP от ESP8266 ==========
+const char* ap_ssid     = "RoverCam-AP";
+const char* ap_password = "rover12345";
 
-// ========== Настройка камеры ==========
+// ========== MQTT ==========
+const char* mqtt_server = "rover-pgk.duckdns.org";
+const int   mqtt_port   = 1883;
+const char* mqtt_user   = "rover";
+const char* mqtt_pass   = "rover123";
+const char* cam_topic   = "dirtymortyu/rover/camera";
+
+// MQTT буфер: 64KB хватает для QVGA-JPEG ~5-15KB → Base64 ~7-20KB
+#define MQTT_BUF_SIZE 65536
+
+WiFiClient   espClient;
+PubSubClient mqttClient(espClient);
+
+// ========== Инициализация камеры ==========
 bool initCamera() {
   camera_config_t config;
-  config.ledc_channel = LEDC_CHANNEL_0;
-  config.ledc_timer = LEDC_TIMER_0;
-  config.pin_d0 = Y2_GPIO_NUM;
-  config.pin_d1 = Y3_GPIO_NUM;
-  config.pin_d2 = Y4_GPIO_NUM;
-  config.pin_d3 = Y5_GPIO_NUM;
-  config.pin_d4 = Y6_GPIO_NUM;
-  config.pin_d5 = Y7_GPIO_NUM;
-  config.pin_d6 = Y8_GPIO_NUM;
-  config.pin_d7 = Y9_GPIO_NUM;
-  config.pin_xclk = XCLK_GPIO_NUM;
-  config.pin_pclk = PCLK_GPIO_NUM;
-  config.pin_vsync = VSYNC_GPIO_NUM;
-  config.pin_href = HREF_GPIO_NUM;
-  config.pin_sscb_sda = SIOD_GPIO_NUM;
-  config.pin_sscb_scl = SIOC_GPIO_NUM;
-  config.pin_pwdn = PWDN_GPIO_NUM;
-  config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 20000000;
-  config.pixel_format = PIXFORMAT_JPEG;
+  config.ledc_channel  = LEDC_CHANNEL_0;
+  config.ledc_timer    = LEDC_TIMER_0;
+  config.pin_d0        = Y2_GPIO_NUM;
+  config.pin_d1        = Y3_GPIO_NUM;
+  config.pin_d2        = Y4_GPIO_NUM;
+  config.pin_d3        = Y5_GPIO_NUM;
+  config.pin_d4        = Y6_GPIO_NUM;
+  config.pin_d5        = Y7_GPIO_NUM;
+  config.pin_d6        = Y8_GPIO_NUM;
+  config.pin_d7        = Y9_GPIO_NUM;
+  config.pin_xclk      = XCLK_GPIO_NUM;
+  config.pin_pclk      = PCLK_GPIO_NUM;
+  config.pin_vsync     = VSYNC_GPIO_NUM;
+  config.pin_href      = HREF_GPIO_NUM;
+  config.pin_sscb_sda  = SIOD_GPIO_NUM;
+  config.pin_sscb_scl  = SIOC_GPIO_NUM;
+  config.pin_pwdn      = PWDN_GPIO_NUM;
+  config.pin_reset     = RESET_GPIO_NUM;
+  config.xclk_freq_hz  = 20000000;
+  config.pixel_format  = PIXFORMAT_JPEG;
 
-  // Настройки качества (VGA для стабильного стрима)
-  if (psramFound()) {
-    config.frame_size = FRAMESIZE_VGA;   // 640x480 (стабильный стрим)
-    config.jpeg_quality = 12;            // 0-63 (12 = хорошее качество)
-    config.fb_count = 2;
-  } else {
-    config.frame_size = FRAMESIZE_CIF;   // 400x296
-    config.jpeg_quality = 16;
-    config.fb_count = 1;
-  }
+  // QVGA (320×240) — оптимальный размер для MQTT
+  config.frame_size   = FRAMESIZE_QVGA;
+  config.jpeg_quality = 20;   // 0-63, меньше = лучше
+  config.fb_count     = 1;
 
-  // Инициализация камеры
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
     Serial.printf("❌ Camera init failed: 0x%x\n", err);
     return false;
   }
 
-  // Дополнительные настройки для лучшего качества
-  sensor_t * s = esp_camera_sensor_get();
-  s->set_brightness(s, 0);     // -2 to 2
-  s->set_contrast(s, 0);       // -2 to 2
-  s->set_saturation(s, 0);     // -2 to 2
-  s->set_special_effect(s, 0); // 0 = No Effect
-  s->set_whitebal(s, 1);       // 0 = disable , 1 = enable
-  s->set_awb_gain(s, 1);       // 0 = disable , 1 = enable
-  s->set_wb_mode(s, 0);        // 0 to 4
-  s->set_exposure_ctrl(s, 1);  // 0 = disable , 1 = enable
-  s->set_aec2(s, 0);           // 0 = disable , 1 = enable
-  s->set_ae_level(s, 0);       // -2 to 2
-  s->set_aec_value(s, 300);    // 0 to 1200
-  s->set_gain_ctrl(s, 1);      // 0 = disable , 1 = enable
-  s->set_agc_gain(s, 0);       // 0 to 30
-  s->set_gainceiling(s, (gainceiling_t)0);  // 0 to 6
-  s->set_bpc(s, 0);            // 0 = disable , 1 = enable
-  s->set_wpc(s, 1);            // 0 = disable , 1 = enable
-  s->set_raw_gma(s, 1);        // 0 = disable , 1 = enable
-  s->set_lenc(s, 1);           // 0 = disable , 1 = enable
-  s->set_hmirror(s, 0);        // 0 = disable , 1 = enable
-  s->set_vflip(s, 0);          // 0 = disable , 1 = enable
-  s->set_dcw(s, 1);            // 0 = disable , 1 = enable
-  s->set_colorbar(s, 0);       // 0 = disable , 1 = enable
+  sensor_t *s = esp_camera_sensor_get();
+  s->set_brightness(s, 0);
+  s->set_contrast(s, 0);
+  s->set_saturation(s, 0);
+  s->set_whitebal(s, 1);
+  s->set_awb_gain(s, 1);
+  s->set_exposure_ctrl(s, 1);
+  s->set_gain_ctrl(s, 1);
+  s->set_hmirror(s, 0);
+  s->set_vflip(s, 0);
 
   Serial.println("✅ Camera initialized!");
   return true;
 }
 
-// ========== MJPEG Stream Handler ==========
-static esp_err_t stream_handler(httpd_req_t *req) {
-  camera_fb_t * fb = NULL;
-  esp_err_t res = ESP_OK;
-  size_t _jpg_buf_len = 0;
-  uint8_t * _jpg_buf = NULL;
-  char * part_buf[64];
-
-  res = httpd_resp_set_type(req, "multipart/x-mixed-replace; boundary=frame");
-  if (res != ESP_OK) {
-    return res;
-  }
-
-  // CORS для доступа с других доменов
-  httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-
-  Serial.println("[Stream] Client connected");
-  int frameCount = 0;
-
-  while (true) {
-    fb = esp_camera_fb_get();
-    if (!fb) {
-      Serial.println("❌ Camera capture failed");
-      res = ESP_FAIL;
+// ========== MQTT переподключение ==========
+void reconnectMQTT() {
+  while (!mqttClient.connected()) {
+    Serial.print("🔄 MQTT connecting...");
+    String clientId = "ESP32CAM-" + String((uint32_t)ESP.getEfuseMac(), HEX);
+    if (mqttClient.connect(clientId.c_str(), mqtt_user, mqtt_pass)) {
+      Serial.println(" OK");
     } else {
-      if (fb->format != PIXFORMAT_JPEG) {
-        bool jpeg_converted = frame2jpg(fb, 80, &_jpg_buf, &_jpg_buf_len);
-        esp_camera_fb_return(fb);
-        fb = NULL;
-        if (!jpeg_converted) {
-          Serial.println("❌ JPEG compression failed");
-          res = ESP_FAIL;
-        }
-      } else {
-        _jpg_buf_len = fb->len;
-        _jpg_buf = fb->buf;
-      }
-    }
-
-    if (res == ESP_OK) {
-      size_t hlen = snprintf((char *)part_buf, 64, 
-        "--frame\r\n"
-        "Content-Type: image/jpeg\r\n"
-        "Content-Length: %u\r\n\r\n", 
-        _jpg_buf_len);
-      res = httpd_resp_send_chunk(req, (const char *)part_buf, hlen);
-    }
-
-    if (res == ESP_OK) {
-      res = httpd_resp_send_chunk(req, (const char *)_jpg_buf, _jpg_buf_len);
-    }
-
-    if (res == ESP_OK) {
-      res = httpd_resp_send_chunk(req, "\r\n", 2);
-    }
-
-    if (fb) {
-      esp_camera_fb_return(fb);
-      fb = NULL;
-      _jpg_buf = NULL;
-    } else if (_jpg_buf) {
-      free(_jpg_buf);
-      _jpg_buf = NULL;
-    }
-
-    if (res != ESP_OK) {
-      break;
-    }
-
-    frameCount++;
-    if (frameCount % 100 == 0) {
-      Serial.printf("[Stream] %d frames sent\n", frameCount);
+      Serial.printf(" FAIL rc=%d, retry 5s\n", mqttClient.state());
+      delay(5000);
     }
   }
-
-  Serial.printf("[Stream] Client disconnected. Total frames: %d\n", frameCount);
-  return res;
 }
 
-// ========== Snapshot Handler ==========
-static esp_err_t snapshot_handler(httpd_req_t *req) {
-  camera_fb_t * fb = NULL;
-  esp_err_t res = ESP_OK;
-
-  fb = esp_camera_fb_get();
+// ========== Захват и публикация кадра ==========
+void publishFrame() {
+  camera_fb_t* fb = esp_camera_fb_get();
   if (!fb) {
-    Serial.println("❌ Snapshot failed");
-    httpd_resp_send_500(req);
-    return ESP_FAIL;
+    Serial.println("❌ Frame capture failed");
+    return;
   }
 
-  httpd_resp_set_type(req, "image/jpeg");
-  httpd_resp_set_hdr(req, "Content-Disposition", "inline; filename=snapshot.jpg");
-  httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+  // Убеждаемся что формат JPEG
+  uint8_t* jpg_buf = fb->buf;
+  size_t   jpg_len = fb->len;
+  uint8_t* converted = NULL;
 
-  res = httpd_resp_send(req, (const char *)fb->buf, fb->len);
-  esp_camera_fb_return(fb);
+  if (fb->format != PIXFORMAT_JPEG) {
+    size_t out_len = 0;
+    bool ok = frame2jpg(fb, 20, &converted, &out_len);
+    esp_camera_fb_return(fb);
+    fb = NULL;
+    if (!ok) { free(converted); return; }
+    jpg_buf = converted;
+    jpg_len = out_len;
+  }
 
-  Serial.printf("[Snapshot] Sent: %d bytes\n", fb->len);
+  // Base64 кодирование
+  size_t   b64_size = 4 * ((jpg_len + 2) / 3) + 1;
+  uint8_t* b64_buf  = (uint8_t*)malloc(b64_size);
 
-  return res;
-}
+  if (!b64_buf) {
+    Serial.println("❌ malloc failed for Base64");
+    if (fb)        esp_camera_fb_return(fb);
+    else if (converted) free(converted);
+    return;
+  }
 
-// ========== Index Page Handler ==========
-static esp_err_t index_handler(httpd_req_t *req) {
-  const char* html = R"rawliteral(
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ESP32-CAM Local Stream</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #1a1a2e;
-      color: #eee;
-      padding: 20px;
-      text-align: center;
-    }
-    h1 { color: #00d9ff; }
-    img {
-      max-width: 100%;
-      border: 2px solid #00d9ff;
-      border-radius: 8px;
-    }
-    .info {
-      background: #16213e;
-      padding: 15px;
-      border-radius: 8px;
-      margin: 20px auto;
-      max-width: 600px;
-    }
-    .status { color: #4ad97a; }
-    a { color: #00d9ff; }
-  </style>
-</head>
-<body>
-  <h1>📹 ESP32-CAM Stream</h1>
-  <div class="info">
-    <p><strong>Статус:</strong> <span class="status">✅ Камера работает</span></p>
-    <p><strong>Режим:</strong> Подключено к ESP8266 AP</p>
-    <p><strong>Stream URL:</strong> <a href="/stream">/stream</a></p>
-    <p><strong>Snapshot URL:</strong> <a href="/snapshot">/snapshot</a></p>
-    <p><strong>Доступ через ESP8266:</strong> http://ESP8266_IP/camera/stream</p>
-  </div>
-  <img src="/stream" alt="Camera Stream">
-  <p style="margin-top: 20px; color: #888;">
-    💡 Для доступа из интернета используйте ESP8266 прокси
-  </p>
-</body>
-</html>
-)rawliteral";
+  size_t b64_len = 0;
+  mbedtls_base64_encode(b64_buf, b64_size, &b64_len, jpg_buf, jpg_len);
 
-  httpd_resp_set_type(req, "text/html");
-  return httpd_resp_send(req, html, strlen(html));
-}
+  if (fb)        esp_camera_fb_return(fb);
+  else if (converted) free(converted);
 
-// ========== Запуск HTTP сервера ==========
-void startCameraServer() {
-  httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-  config.server_port = 80;
-  config.ctrl_port = 32768;
-
-  httpd_uri_t index_uri = {
-    .uri       = "/",
-    .method    = HTTP_GET,
-    .handler   = index_handler,
-    .user_ctx  = NULL
-  };
-
-  httpd_uri_t stream_uri = {
-    .uri       = "/stream",
-    .method    = HTTP_GET,
-    .handler   = stream_handler,
-    .user_ctx  = NULL
-  };
-
-  httpd_uri_t snapshot_uri = {
-    .uri       = "/snapshot",
-    .method    = HTTP_GET,
-    .handler   = snapshot_handler,
-    .user_ctx  = NULL
-  };
-
-  Serial.println("🚀 Starting HTTP server...");
-  if (httpd_start(&camera_httpd, &config) == ESP_OK) {
-    httpd_register_uri_handler(camera_httpd, &index_uri);
-    httpd_register_uri_handler(camera_httpd, &stream_uri);
-    httpd_register_uri_handler(camera_httpd, &snapshot_uri);
-    Serial.println("✅ HTTP server started on port 80");
+  // Публикуем в MQTT
+  bool ok = mqttClient.publish(cam_topic, b64_buf, b64_len, false);
+  if (!ok) {
+    Serial.printf("⚠️ MQTT publish failed (size=%u). Reconnecting...\n", b64_len);
+    mqttClient.disconnect();
   } else {
-    Serial.println("❌ HTTP server failed to start");
+    Serial.printf("[CAM] Frame sent: jpeg=%uB b64=%uB\n", jpg_len, b64_len);
   }
+
+  free(b64_buf);
 }
 
 // ========== SETUP ==========
 void setup() {
   Serial.begin(115200);
-  Serial.setDebugOutput(true);
   Serial.println();
   Serial.println("========================================");
-  Serial.println("   ESP32-CAM v4.0 (WiFiManager)");
+  Serial.println("   ESP32-CAM v6.0 (MQTT Stream)");
   Serial.println("========================================");
 
-  // Инициализация камеры
   if (!initCamera()) {
-    Serial.println("❌ CRITICAL: Camera initialization failed!");
+    Serial.println("❌ CRITICAL: Camera init failed!");
     return;
   }
 
-  // WiFiManager — автоматическое подключение или портал настройки
-  WiFiManager wm;
-  wm.setConfigPortalTimeout(180);  // 3 мин на настройку, потом перезагрузка
-
-  Serial.println("\n📡 Подключение к WiFi...");
-  Serial.println("Если сеть не найдена — подключитесь к WiFi 'ESP32-CAM-Setup'");
-
-  if (!wm.autoConnect("ESP32-CAM-Setup")) {
-    Serial.println("❌ Не удалось подключиться. Перезагрузка...");
-    ESP.restart();
-  }
-
+  // Подключение к ESP8266 AP
+  WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
+  WiFi.begin(ap_ssid, ap_password);
 
-  Serial.println("\n✅ WiFi connected!");
-  Serial.print("📍 IP: ");
-  Serial.println(WiFi.localIP());
-  Serial.print("📶 Signal: ");
-  Serial.print(WiFi.RSSI());
-  Serial.println(" dBm");
-
-  startCameraServer();
-
-  // mDNS — камера доступна по http://esp32cam.local
-  if (MDNS.begin("esp32cam")) {
-    Serial.println("✅ mDNS: http://esp32cam.local");
+  Serial.printf("📡 Connecting to AP: %s\n", ap_ssid);
+  unsigned long t = millis();
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500); Serial.print(".");
+    if (millis() - t > 30000) {
+      Serial.println("\n❌ WiFi timeout! Restarting...");
+      ESP.restart();
+    }
   }
+  Serial.printf("\n✅ Connected! IP: %s\n", WiFi.localIP().toString().c_str());
+
+  // MQTT
+  mqttClient.setServer(mqtt_server, mqtt_port);
+  mqttClient.setBufferSize(MQTT_BUF_SIZE);
+  mqttClient.setKeepAlive(60);
 
   Serial.println("\n========================================");
-  Serial.println("✅ ESP32-CAM готова к работе!");
-  Serial.println("========================================");
-  Serial.print("   http://");
-  Serial.print(WiFi.localIP());
-  Serial.println("/stream");
-  Serial.println("   http://esp32cam.local/stream");
+  Serial.println("✅ ESP32-CAM готова! Публикую кадры...");
+  Serial.printf("   Topic: %s\n", cam_topic);
   Serial.println("========================================\n");
 }
 
 // ========== LOOP ==========
 void loop() {
-  // Проверка WiFi соединения
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("⚠️ WiFi disconnected! Reconnecting...");
+    Serial.println("⚠️ WiFi lost, reconnecting...");
     WiFi.reconnect();
     delay(5000);
+    return;
   }
-  
-  delay(100);
+
+  if (!mqttClient.connected()) reconnectMQTT();
+  mqttClient.loop();
+
+  publishFrame();
+  delay(150);  // ~6-7 FPS — баланс скорости и нагрузки на MQTT
 }

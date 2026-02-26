@@ -479,36 +479,23 @@ window.onload = () => {
         };
     }
 
-    // Видео стрим напрямую с ESP32-CAM
-    const cameraIpInput = $("#cameraIp");
     const streamImg = $("#stream");
     const streamOverlay = $("#streamOverlay");
 
-    // Загружаем сохранённый IP камеры
-    const savedCamIp = localStorage.getItem("cameraIp");
-    if (savedCamIp && cameraIpInput) cameraIpInput.value = savedCamIp;
-
     if ($("#streamStart")) {
         $("#streamStart").onclick = () => {
-            const camIp = cameraIpInput?.value.trim();
-            if (!camIp) {
-                alert("Введите IP адрес ESP32-CAM!");
-                return;
-            }
-
-            localStorage.setItem("cameraIp", camIp);
-            // Стрим идёт через прокси ESP8266, а не напрямую с ESP32-CAM
-            const streamUrl = `http://${camIp}/camera/stream`;
+            // Стрим через Flask-бэкенд (HTTPS) — без Mixed Content
+            const streamUrl = `${apiBase}/api/camera/stream`;
             streamImg.src = streamUrl;
             if (streamOverlay) streamOverlay.style.display = "none";
-            log(`Видео: подключение к ${streamUrl}`, "net");
+            log(`Видео: ${streamUrl}`, "net");
 
             streamImg.onerror = () => {
                 if (streamOverlay) {
                     streamOverlay.style.display = "flex";
                     streamOverlay.textContent = "Нет сигнала";
                 }
-                log("Камера недоступна. Проверьте IP ESP32-CAM", "net");
+                log("Камера недоступна. Проверьте ESP32-CAM и сервер", "net");
             };
             streamImg.onload = () => {
                 log("Видео подключено!", "net");
