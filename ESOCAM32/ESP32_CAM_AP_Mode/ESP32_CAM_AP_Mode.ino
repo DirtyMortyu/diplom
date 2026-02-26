@@ -1,16 +1,15 @@
 /*
- * ESP32-CAM — публикация кадров через MQTT
+ * ESP32-CAM — публикация кадров через MQTT (сырой JPEG, без Base64)
  *
  * Подключается к хотспоту ESP8266 (RoverCam-AP),
  * захватывает JPEG-кадры и публикует в MQTT топик
- * dirtymortyu/rover/camera (Base64).
+ * dirtymortyu/rover/camera как бинарные данные.
  * Flask-бэкенд (bd.py) раздаёт их как MJPEG по HTTPS.
  */
 
 #include "esp_camera.h"
 #include <WiFi.h>
 #include <PubSubClient.h>
-#include "mbedtls/base64.h"
 
 // ========== Пины камеры AI-Thinker ==========
 #define PWDN_GPIO_NUM     32
@@ -41,8 +40,8 @@ const char* mqtt_user   = "rover";
 const char* mqtt_pass   = "rover123";
 const char* cam_topic   = "dirtymortyu/rover/camera";
 
-// MQTT буфер: 64KB хватает для QVGA-JPEG ~5-15KB → Base64 ~7-20KB
-#define MQTT_BUF_SIZE 65536
+// MQTT буфер: 20KB хватает для QVGA-JPEG ~5-15KB (сырой, без Base64)
+#define MQTT_BUF_SIZE 20480
 
 WiFiClient   espClient;
 PubSubClient mqttClient(espClient);
@@ -111,7 +110,7 @@ void reconnectMQTT() {
   }
 }
 
-// ========== Захват и публикация кадра ==========
+// ========== Захват и публикация кадра (сырой JPEG) ==========
 void publishFrame() {
   camera_fb_t* fb = esp_camera_fb_get();
   if (!fb) {
@@ -119,7 +118,6 @@ void publishFrame() {
     return;
   }
 
-  // Убеждаемся что формат JPEG
   uint8_t* jpg_buf = fb->buf;
   size_t   jpg_len = fb->len;
   uint8_t* converted = NULL;
@@ -134,33 +132,17 @@ void publishFrame() {
     jpg_len = out_len;
   }
 
-  // Base64 кодирование
-  size_t   b64_size = 4 * ((jpg_len + 2) / 3) + 1;
-  uint8_t* b64_buf  = (uint8_t*)malloc(b64_size);
-
-  if (!b64_buf) {
-    Serial.println("❌ malloc failed for Base64");
-    if (fb)        esp_camera_fb_return(fb);
-    else if (converted) free(converted);
-    return;
-  }
-
-  size_t b64_len = 0;
-  mbedtls_base64_encode(b64_buf, b64_size, &b64_len, jpg_buf, jpg_len);
-
-  if (fb)        esp_camera_fb_return(fb);
-  else if (converted) free(converted);
-
-  // Публикуем в MQTT
-  bool ok = mqttClient.publish(cam_topic, b64_buf, b64_len, false);
+  // Публикуем сырой JPEG — без Base64, быстрее и меньше
+  bool ok = mqttClient.publish(cam_topic, jpg_buf, jpg_len, false);
   if (!ok) {
-    Serial.printf("⚠️ MQTT publish failed (size=%u). Reconnecting...\n", b64_len);
+    Serial.printf("⚠️ MQTT publish failed (size=%u). Reconnecting...\n", jpg_len);
     mqttClient.disconnect();
   } else {
-    Serial.printf("[CAM] Frame sent: jpeg=%uB b64=%uB\n", jpg_len, b64_len);
+    Serial.printf("[CAM] Frame sent: %u bytes\n", jpg_len);
   }
 
-  free(b64_buf);
+  if (fb)             esp_camera_fb_return(fb);
+  else if (converted) free(converted);
 }
 
 // ========== SETUP ==========
@@ -216,5 +198,5 @@ void loop() {
   mqttClient.loop();
 
   publishFrame();
-  delay(150);  // ~6-7 FPS — баланс скорости и нагрузки на MQTT
+  delay(50);  // ~15-20 FPS
 }

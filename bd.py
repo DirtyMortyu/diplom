@@ -3,7 +3,6 @@ import pymysql.cursors
 from flask_cors import CORS
 import os
 import paho.mqtt.client as mqtt
-import base64
 import threading
 import time
 
@@ -17,10 +16,11 @@ MQTT_USER = "rover"
 MQTT_PASSWORD = "rover123"
 MQTT_CAMERA_TOPIC = "dirtymortyu/rover/camera"
 
-# Глобальная переменная для хранения последнего кадра
+# Глобальные переменные для кадра
 latest_frame = None
 frame_lock = threading.Lock()
 frame_timestamp = 0
+frame_event = threading.Event()  # сигнал о новом кадре
 
 # === Настройки подключения к БД ===
 db_config = {
@@ -237,19 +237,17 @@ def on_mqtt_connect(client, userdata, flags, rc):
         print(f"❌ MQTT Connection failed with code {rc}")
 
 def on_mqtt_message(client, userdata, msg):
-    """Callback при получении сообщения из MQTT"""
+    """Callback при получении сообщения из MQTT — сырой JPEG без Base64"""
     global latest_frame, frame_timestamp
     try:
-        # Декодируем Base64 обратно в JPEG
-        jpeg_data = base64.b64decode(msg.payload)
-
         with frame_lock:
-            latest_frame = jpeg_data
+            latest_frame = bytes(msg.payload)
             frame_timestamp = time.time()
 
-        print(f"📸 Frame received: {len(jpeg_data)} bytes")
+        frame_event.set()  # будим generate() немедленно
+        print(f"📸 Frame received: {len(msg.payload)} bytes")
     except Exception as e:
-        print(f"❌ Error decoding frame: {e}")
+        print(f"❌ Error storing frame: {e}")
 
 def start_mqtt_client():
     """Запускает MQTT клиент в отдельном потоке"""
@@ -274,31 +272,23 @@ print("🚀 MQTT client started in background thread")
 # ========== API Endpoint для камеры ==========
 @app.route("/api/camera/stream")
 def camera_stream():
-    """MJPEG стрим из MQTT снапшотов"""
+    """MJPEG стрим — кадр отправляется сразу при получении из MQTT"""
     def generate():
         last_sent_timestamp = 0
-        no_frame_count = 0
 
         while True:
+            # Ждём нового кадра (таймаут 5 сек — чтобы не зависнуть)
+            frame_event.wait(timeout=5.0)
+            frame_event.clear()
+
             with frame_lock:
                 current_frame = latest_frame
                 current_timestamp = frame_timestamp
 
-            # Проверяем что есть новый кадр
             if current_frame and current_timestamp > last_sent_timestamp:
-                # Формируем MJPEG кадр
                 yield (b'--frame\r\n'
                        b'Content-Type: image/jpeg\r\n\r\n' + current_frame + b'\r\n')
                 last_sent_timestamp = current_timestamp
-                no_frame_count = 0
-            else:
-                # Если долго нет кадров, отправляем заглушку
-                no_frame_count += 1
-                if no_frame_count > 50:  # ~5 секунд без кадров
-                    print("⚠️ No frames received for 5 seconds")
-                    no_frame_count = 0
-
-            time.sleep(0.1)  # 10 FPS максимум
 
     return Response(generate(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
