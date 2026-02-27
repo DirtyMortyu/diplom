@@ -107,8 +107,10 @@ void setup() {
 
   WiFiManager wm;
   wm.setConfigPortalTimeout(180);
+  WiFi.setSleepMode(WIFI_NONE_SLEEP);
 
   Serial.println("📡 Подключение к WiFi...");
+  Serial.println("Если сеть не найдена — подключитесь к 'Rover-Setup'");
   if (!wm.autoConnect("Rover-Setup")) {
     Serial.println("❌ WiFi failed. Restarting...");
     ESP.restart();
