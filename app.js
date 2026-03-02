@@ -306,6 +306,13 @@ function loadUserPanel() {
 
 // ======= УПРАВЛЕНИЕ КНОПКАМИ =======
 document.querySelectorAll(".btn[data-cmd]").forEach(b => {
+    if (b.dataset.cmd === "TURN360") {
+        b.addEventListener("click", () => {
+            sendESPCommand("TURN360");
+            log("Поворот 360°", "motor");
+        });
+        return;
+    }
     b.addEventListener("mousedown", () => sendESPCommand(b.dataset.cmd));
     b.addEventListener("mouseup", stopESP);
     b.addEventListener("mouseleave", stopESP); // Останавливаем если увели курсор
@@ -342,7 +349,15 @@ const keyMap = {
 
 document.addEventListener("keydown", e => {
 
-    if (kbEnabled && keyMap[e.key] && currentCmd !== keyMap[e.key]) {
+    if (!kbEnabled) return;
+
+    if ((e.key === "r" || e.key === "R") && !e.repeat) {
+        sendESPCommand("TURN360");
+        log("Поворот 360° (клавиша R)", "motor");
+        return;
+    }
+
+    if (keyMap[e.key] && currentCmd !== keyMap[e.key]) {
 
         currentCmd = keyMap[e.key];
 
