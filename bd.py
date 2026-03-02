@@ -185,6 +185,16 @@ def manage_user(user_id=None):
                 return jsonify({"success": False, "message": f"Роль {role_name} не найдена"}), 400
             role_id = role_row["idrole"]
 
+            # Проверка дублирующегося логина
+            if request.method == "POST":
+                cursor.execute("SELECT idUsers FROM Users WHERE login=%s", (login_val,))
+                if cursor.fetchone():
+                    return jsonify({"success": False, "message": "Логин уже занят"}), 409
+            elif request.method == "PUT" and user_id:
+                cursor.execute("SELECT idUsers FROM Users WHERE login=%s AND idUsers!=%s", (login_val, user_id))
+                if cursor.fetchone():
+                    return jsonify({"success": False, "message": "Логин уже занят"}), 409
+
             if request.method == "PUT" and user_id:
                 if password_val:
                     hashed = bcrypt.hashpw(password_val.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")

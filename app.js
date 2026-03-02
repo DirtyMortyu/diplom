@@ -94,12 +94,31 @@ const stopESP = () => sendESPCommand("stop");
 function showLoginModal() { $("#loginModal").style.display = "flex"; }
 function hideLoginModal() { $("#loginModal").style.display = "none"; }
 
+function showLoginError(msg) {
+    const el = $("#loginError");
+    if (!el) return;
+    el.textContent = msg;
+    el.style.display = "block";
+}
+
+function clearLoginError() {
+    const el = $("#loginError");
+    if (el) { el.style.display = "none"; el.textContent = ""; }
+}
+
 async function login() {
     const loginInput = $("#loginInput").value.trim();
     const password = $("#passwordInput").value;
     apiBase = $("#apiBase").value.trim();
 
-    if (!loginInput || !password) return alert("Введите данные!");
+    clearLoginError();
+
+    if (!loginInput) return showLoginError("Введите логин");
+    if (!password) return showLoginError("Введите пароль");
+    if (!apiBase) return showLoginError("Укажите адрес API сервера");
+
+    const btn = $("#loginSubmitBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "Вход..."; }
 
     try {
         const response = await fetch(`${apiBase}/api/login`, {
@@ -116,10 +135,13 @@ async function login() {
             hideLoginModal();
             log(`Вход: ${data.role}`, "misc");
         } else {
-            alert(data.message);
+            showLoginError(data.message || "Неверный логин или пароль");
         }
     } catch (err) {
+        showLoginError("Не удалось подключиться к серверу");
         log("Ошибка сервера авторизации", "net");
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "Войти"; }
     }
 }
 
