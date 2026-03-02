@@ -29,6 +29,8 @@ void sendCommand(const char* command) {
     Serial1.flush();
     lastSentCommand = command;
     Serial.print("[Motors] -> "); Serial.println(command);
+    // TURN360 — одноразовая команда, сбрасываем чтобы можно было повторить
+    if (strcmp(command, "TURN360") == 0) lastSentCommand = "STOP";
   }
 }
 

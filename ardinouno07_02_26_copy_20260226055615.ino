@@ -27,7 +27,6 @@ void backward();
 void turnLeft();
 void turnRight();
 void stop();
-void turn360();
 void processCommand(String cmd); // Прототип функции обработки
 
 void setup() {
@@ -96,8 +95,6 @@ void processCommand(String cmd) {
       turnRight();
     } else if (cmd == "STOP") {
       stop();
-    } else if (cmd == "TURN360") {
-      turn360();
     }
 }
 
@@ -163,19 +160,4 @@ void stop() {
   digitalWrite(rightMotor1Pin2, LOW);
   digitalWrite(rightMotor2Pin1, LOW);
   digitalWrite(rightMotor2Pin2, LOW);
-}
-
-void turn360() {
-  Serial.println("Action: TURN360");
-  // Левые гусеницы назад, правые вперёд — вращение на месте
-  digitalWrite(leftMotor1Pin1, LOW);
-  digitalWrite(leftMotor1Pin2, HIGH);
-  digitalWrite(leftMotor2Pin1, LOW);
-  digitalWrite(leftMotor2Pin2, HIGH);
-  digitalWrite(rightMotor1Pin1, HIGH);
-  digitalWrite(rightMotor1Pin2, LOW);
-  digitalWrite(rightMotor2Pin1, HIGH);
-  digitalWrite(rightMotor2Pin2, LOW);
-  delay(2000); // Подбери время под свой ровер (мс)
-  stop();
 }
