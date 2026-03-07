@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Виджеты ВК — СЭО «Катод»</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0d0d0f;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Montserrat', sans-serif;
+    color: #fff;
+    padding: 40px 20px;
+    gap: 30px;
+  }
+
+  h2 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+
+  .widgets-container {
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+    background: #1A1A1E;
+    border-radius: 12px;
+  }
+
+  .widget-card {
+    width: 220px;
+    height: 310px;
+    position: relative;
+    overflow: hidden;
+    border-radius: 10px;
+    background: #121214;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+  }
+  .widget-card:hover {
+    transform: translateY(-2px);
+  }
+
+  /* Photo area */
+  .card-photo {
+    position: relative;
+    width: 100%;
+    height: 210px;
+    background: #1a1a20;
+    overflow: hidden;
+  }
+
+  /* Placeholder for actual photos — using gradient silhouettes */
+  .card-photo .placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, #1e1e24 0%, #16161a 100%);
+  }
+
+  .placeholder-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,110,4,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: rgba(255,110,4,0.5);
+  }
+
+  /* PCB overlay on photo */
+  .card-photo::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(180deg, transparent 50%, rgba(18,18,20,0.95) 100%);
+    pointer-events: none;
+  }
+
+  /* Circuit line accent on card */
+  .circuit-accent {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #3a7bff 30%, #FF6E04 70%, transparent);
+    opacity: 0.5;
+    z-index: 5;
+  }
+
+  /* Top label overlay */
+  .card-top-label {
+    position: absolute;
+    top: 12px;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    text-align: center;
+    font-size: 28px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #fff;
+    text-shadow: 0 2px 20px rgba(0,0,0,0.8);
+  }
+
+  /* Bottom info */
+  .card-info {
+    padding: 14px 16px;
+    position: relative;
+    z-index: 5;
+  }
+
+  .card-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #FF6E04;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+
+  .card-desc {
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.4);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* Corner bracket on card */
+  .card-corner {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    width: 16px;
+    height: 16px;
+    border-right: 1.5px solid rgba(255,110,4,0.3);
+    border-bottom: 1.5px solid rgba(255,110,4,0.3);
+    z-index: 5;
+  }
+
+  /* Small node dots */
+  .node-dot {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #3a7bff;
+    opacity: 0.3;
+    z-index: 5;
+  }
+
+  .scale-note {
+    font-size: 11px;
+    color: #444;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<h2>Виджеты ВК — 3 карточки</h2>
+
+<div class="widgets-container">
+  <!-- Card 1: Вступай -->
+  <div class="widget-card">
+    <div class="circuit-accent"></div>
+    <div class="card-photo">
+      <div class="placeholder">
+        <div class="placeholder-icon">⚡</div>
+      </div>
+      <div class="card-top-label">ВСТУПАЙ</div>
+    </div>
+    <div class="card-info">
+      <div class="card-title">В семью</div>
+      <div class="card-desc">Анкета</div>
+    </div>
+    <div class="card-corner"></div>
+    <div class="node-dot" style="top:180px; left:12px;"></div>
+  </div>
+
+  <!-- Card 2: Смотри -->
+  <div class="widget-card">
+    <div class="circuit-accent"></div>
+    <div class="card-photo">
+      <div class="placeholder">
+        <div class="placeholder-icon">▶</div>
+      </div>
+      <div class="card-top-label">СМОТРИ</div>
+    </div>
+    <div class="card-info">
+      <div class="card-title">На нас</div>
+      <div class="card-desc">Видео</div>
+    </div>
+    <div class="card-corner"></div>
+    <div class="node-dot" style="top:180px; left:12px;"></div>
+  </div>
+
+  <!-- Card 3: Знакомься -->
+  <div class="widget-card">
+    <div class="circuit-accent"></div>
+    <div class="card-photo">
+      <div class="placeholder">
+        <div class="placeholder-icon">👤</div>
+      </div>
+      <div class="card-top-label">ЗНАКОМЬСЯ</div>
+    </div>
+    <div class="card-info">
+      <div class="card-title">С составом</div>
+      <div class="card-desc">Фото</div>
+    </div>
+    <div class="card-corner"></div>
+    <div class="node-dot" style="top:180px; left:12px;"></div>
+  </div>
+</div>
+
+<p class="scale-note">Фото бойцов подставляются поверх плейсхолдеров. Фон карточек — #121214, акценты — оранжевый #FF6E04 + синие линии #3A7BFF.</p>
+
+</body>
+</html>
